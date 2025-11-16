@@ -1,0 +1,54 @@
+{
+  "name": "junitify-dart",
+  "image": "dart:3.10.0",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": "true",
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000",
+      "upgradePackages": "true"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true,
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+
+  // パッケージキャッシュ用のマウント設定
+  "mounts": [
+    "source=dart-pub-cache,target=/home/vscode/.pub-cache,type=volume"
+  ],
+
+  // 初回作成時のみ実行
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.pub-cache && dart pub get",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dart-code.dart-code",
+        "usernamehw.errorlens",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "dart.enableSdkFormatter": true,
+        "editor.formatOnSave": true,
+        "editor.formatOnPaste": true,
+        "editor.defaultFormatter": "dart-code.dart-code",
+        "editor.codeActionsOnSave": {
+          "source.fixAll": "explicit",
+          "source.organizeImports": "explicit"
+        },
+
+        // ターミナル設定
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+
+  "remoteUser": "vscode"
+}
