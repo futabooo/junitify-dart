@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../common/error.dart';
 import '../common/result.dart';
+import '../error/error_reporter.dart';
 import '../models/dart_test_result.dart';
 import '../models/test_case.dart';
 import '../models/test_status.dart';
@@ -10,7 +11,12 @@ import '../models/test_suite.dart';
 /// Interface for parsing Dart test JSON output.
 abstract class DartTestParser {
   /// Parses a JSON string into a DartTestResult.
-  Result<DartTestResult, ParseError> parse(String jsonString);
+  ///
+  /// [errorReporter] is optional and used for debug logging when hidden tests are detected.
+  Result<DartTestResult, ParseError> parse(
+    String jsonString, {
+    ErrorReporter? errorReporter,
+  });
 }
 
 /// Default implementation of DartTestParser.
@@ -18,7 +24,10 @@ class DefaultDartTestParser implements DartTestParser {
   const DefaultDartTestParser();
 
   @override
-  Result<DartTestResult, ParseError> parse(String jsonString) {
+  Result<DartTestResult, ParseError> parse(
+    String jsonString, {
+    ErrorReporter? errorReporter,
+  }) {
     try {
       // Parse JSON lines (Dart test outputs newline-delimited JSON)
       final lines = jsonString.trim().split('\n');
@@ -44,7 +53,7 @@ class DefaultDartTestParser implements DartTestParser {
       }
 
       // Parse events into test results
-      return _parseEvents(events);
+      return _parseEvents(events, errorReporter);
     } catch (e) {
       return Failure(JsonSyntaxError('Unexpected error: $e'));
     }
@@ -52,6 +61,7 @@ class DefaultDartTestParser implements DartTestParser {
 
   Result<DartTestResult, ParseError> _parseEvents(
     List<Map<String, dynamic>> events,
+    ErrorReporter? errorReporter,
   ) {
     try {
       final suites = <String, _SuiteBuilder>{};
@@ -72,7 +82,7 @@ class DefaultDartTestParser implements DartTestParser {
             _processTestStartEvent(event, tests, suites);
             break;
           case 'testDone':
-            _processTestDoneEvent(event, tests, suites);
+            _processTestDoneEvent(event, tests, suites, errorReporter);
             break;
           case 'done':
             // Test run completed
@@ -149,6 +159,7 @@ class DefaultDartTestParser implements DartTestParser {
     Map<String, dynamic> event,
     Map<int, _TestInfo> tests,
     Map<String, _SuiteBuilder> suites,
+    ErrorReporter? errorReporter,
   ) {
     final testID = event['testID'] as int?;
     if (testID == null) return;
@@ -158,14 +169,26 @@ class DefaultDartTestParser implements DartTestParser {
 
     final result = event['result'] as String?;
     final skipped = event['skipped'] as bool? ?? false;
-    final hidden = event['hidden'] as bool? ?? false;
+    // Handle hidden flag: check if it's a boolean, default to false if not
+    final hiddenValue = event['hidden'];
+    final hidden = hiddenValue is bool ? hiddenValue : false;
     final time = event['time'] as int? ?? 0;
     final error = event['error'] as String?;
     final stackTrace = event['stackTrace'] as String?;
 
+    // If hidden is true, skip test case creation completely
+    if (hidden) {
+      if (errorReporter != null) {
+        errorReporter.debug(
+          'Ignoring hidden test: ${testInfo.suiteName}::${testInfo.name}',
+        );
+      }
+      return;
+    }
+
     // Determine status
     TestStatus status;
-    if (skipped || hidden) {
+    if (skipped) {
       status = TestStatus.skipped;
     } else if (result == 'success') {
       status = TestStatus.passed;
@@ -229,8 +252,18 @@ class DefaultDartTestParser implements DartTestParser {
       totalTime += suiteTime;
     }
 
+    // Allow empty test suites (e.g., when all tests are hidden)
+    // This is valid according to requirement 3.5
     if (testSuites.isEmpty) {
-      return const Failure(InvalidFormatError('tests', 'No test cases found'));
+      // Return an empty result instead of an error
+      final emptyResult = DartTestResult(
+        suites: [],
+        totalTests: 0,
+        totalFailures: 0,
+        totalSkipped: 0,
+        totalTime: Duration.zero,
+      );
+      return Success(emptyResult);
     }
 
     final result = DartTestResult(

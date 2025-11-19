@@ -135,5 +135,83 @@ void main() {
       expect(parseResult.isFailure, isTrue);
       expect(parseResult.errorOrNull, isA<JsonSyntaxError>());
     });
+
+    test('excludes hidden tests from XML conversion', () async {
+      final inputFile = File('${tempDir.path}/input.json');
+      const inputJson = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"hidden test","suiteID":0},"time":0}
+{"type":"testDone","testID":1,"result":"success","hidden":true,"time":100}
+{"type":"testStart","test":{"id":2,"name":"visible test","suiteID":0},"time":100}
+{"type":"testDone","testID":2,"result":"success","time":200}
+{"type":"done"}
+''';
+      await inputFile.writeAsString(inputJson);
+
+      final inputSource = FileInputSource(inputFile.path);
+      final inputResult = await inputSource.readJson();
+      expect(inputResult.isSuccess, isTrue);
+
+      const parser = DefaultDartTestParser();
+      final parseResult = parser.parse(inputResult.valueOrNull!);
+      expect(parseResult.isSuccess, isTrue);
+
+      final testResult = parseResult.valueOrNull!;
+      expect(testResult.totalTests, equals(1));
+      expect(testResult.suites.first.testCases.length, equals(1));
+      expect(testResult.suites.first.testCases.first.name, equals('visible test'));
+
+      const generator = DefaultJUnitXmlGenerator();
+      final xmlDoc = generator.convert(testResult);
+
+      final outputFile = File('${tempDir.path}/output.xml');
+      final outputDest = FileOutputDestination(outputFile.path);
+      final outputResult = await outputDest.writeXml(xmlDoc);
+      expect(outputResult.isSuccess, isTrue);
+
+      final content = await outputFile.readAsString();
+      expect(content, contains('visible test'));
+      expect(content, isNot(contains('hidden test')));
+      expect(content, contains('tests="1"'));
+    });
+
+    test('handles all tests being hidden in end-to-end conversion', () async {
+      final inputFile = File('${tempDir.path}/input.json');
+      const inputJson = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"hidden test 1","suiteID":0},"time":0}
+{"type":"testDone","testID":1,"result":"success","hidden":true,"time":100}
+{"type":"testStart","test":{"id":2,"name":"hidden test 2","suiteID":0},"time":100}
+{"type":"testDone","testID":2,"result":"success","hidden":true,"time":200}
+{"type":"done"}
+''';
+      await inputFile.writeAsString(inputJson);
+
+      final inputSource = FileInputSource(inputFile.path);
+      final inputResult = await inputSource.readJson();
+      expect(inputResult.isSuccess, isTrue);
+
+      const parser = DefaultDartTestParser();
+      final parseResult = parser.parse(inputResult.valueOrNull!);
+      expect(parseResult.isSuccess, isTrue);
+
+      final testResult = parseResult.valueOrNull!;
+      expect(testResult.totalTests, equals(0));
+      expect(testResult.suites.isEmpty, isTrue);
+
+      const generator = DefaultJUnitXmlGenerator();
+      final xmlDoc = generator.convert(testResult);
+
+      final outputFile = File('${tempDir.path}/output.xml');
+      final outputDest = FileOutputDestination(outputFile.path);
+      final outputResult = await outputDest.writeXml(xmlDoc);
+      expect(outputResult.isSuccess, isTrue);
+
+      final content = await outputFile.readAsString();
+      // Empty test suites should still produce valid XML (may be self-closing tag)
+      expect(content, contains('testsuites'));
+      // When all tests are hidden, XML may have tests="0" attribute or be empty
+      // The XML is valid either way
+    });
   });
 }
