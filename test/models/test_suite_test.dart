@@ -235,5 +235,157 @@ void main() {
 
       expect(suite1.hashCode, equals(suite2.hashCode));
     });
+
+    test('systemErr field is optional and can be null', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      expect(testSuite.systemErr, isNull);
+    });
+
+    test('systemErr field can contain error output', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'Error line 1\nError line 2',
+      );
+
+      expect(testSuite.systemErr, equals('Error line 1\nError line 2'));
+    });
+
+    test('systemErr field can be empty string', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: '',
+      );
+
+      expect(testSuite.systemErr, equals(''));
+    });
+
+    test('equals method includes systemErr field', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'error',
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'error',
+      );
+
+      final suite3 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'different',
+      );
+
+      expect(suite1, equals(suite2));
+      expect(suite1, isNot(equals(suite3)));
+    });
+
+    test('hashCode includes systemErr field', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'error',
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemErr: 'error',
+      );
+
+      expect(suite1.hashCode, equals(suite2.hashCode));
+    });
+
+    test('systemOut and systemErr can be set simultaneously', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        systemOut: 'Output line',
+        systemErr: 'Error line',
+      );
+
+      expect(testSuite.systemOut, equals('Output line'));
+      expect(testSuite.systemErr, equals('Error line'));
+    });
   });
 }

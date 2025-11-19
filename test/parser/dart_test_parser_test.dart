@@ -270,6 +270,164 @@ void main() {
       });
     });
 
+    group('error output event support', () {
+      test('collects error output events with messageType stderr', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"Error line 1","messageType":"stderr","time":50}
+{"type":"print","testID":1,"message":"Error line 2","messageType":"stderr","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        expect(testResult.suites.length, equals(1));
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, isNotNull);
+        expect(suite.systemErr, equals('Error line 1\nError line 2'));
+        expect(suite.systemOut, isNull);
+      });
+
+      test('collects error output events with messageType error', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"Error message","messageType":"error","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, isNotNull);
+        expect(suite.systemErr, equals('Error message'));
+      });
+
+      test('handles empty message in error output event', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test with empty error","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"","messageType":"stderr","time":50}
+{"type":"print","testID":1,"message":"Non-empty error","messageType":"stderr","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, equals('\nNon-empty error'));
+      });
+
+      test('ignores error output event when testID is missing', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","message":"Error without testID","messageType":"stderr","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, isNull);
+      });
+
+      test('ignores error output event when testID does not match any test', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":999,"message":"Error for non-existent test","messageType":"stderr","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, isNull);
+      });
+
+      test('handles missing message field in error output event', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":1,"messageType":"stderr","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        // Missing message field is treated as empty string, which becomes a newline
+        expect(suite.systemErr, equals('\n'));
+      });
+
+      test('systemErr is null when no error output events exist', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test without error output","suiteID":0},"time":0}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemErr, isNull);
+      });
+
+      test('processes print events as systemOut when messageType is print or null', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"Output line","messageType":"print","time":50}
+{"type":"print","testID":1,"message":"Another output","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNotNull);
+        expect(suite.systemOut, contains('Output line'));
+        expect(suite.systemOut, contains('Another output'));
+        expect(suite.systemErr, isNull);
+      });
+
+      test('collects both systemOut and systemErr from different events', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"Output line","messageType":"print","time":50}
+{"type":"print","testID":1,"message":"Error line","messageType":"stderr","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, equals('Output line'));
+        expect(suite.systemErr, equals('Error line'));
+      });
+    });
+
       test('processes test case normally when hidden is false', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}

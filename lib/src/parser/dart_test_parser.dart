@@ -170,21 +170,43 @@ class DefaultDartTestParser implements DartTestParser {
     if (suite == null) return;
 
     final message = event['message'] as String?;
-    
-    // Initialize StringBuffer if null
-    suite.systemOut ??= StringBuffer();
-    
-    // If message is null or empty, treat as newline
-    if (message == null || message.isEmpty) {
-      suite.systemOut!.write('\n');
-      suite._lastMessageWasEmpty = true;
-    } else {
-      // Append separator if buffer is not empty and last message was not empty
-      if (suite.systemOut!.isNotEmpty && !suite._lastMessageWasEmpty) {
-        suite.systemOut!.write('\n');
+    final messageType = event['messageType'] as String?;
+
+    // Check if this is an error output event
+    final isErrorOutput = messageType == 'stderr' || messageType == 'error';
+
+    if (isErrorOutput) {
+      // Process as error output
+      suite.systemErr ??= StringBuffer();
+
+      // If message is null or empty, treat as newline
+      if (message == null || message.isEmpty) {
+        suite.systemErr!.write('\n');
+        suite._lastErrorMessageWasEmpty = true;
+      } else {
+        // Append separator if buffer is not empty and last message was not empty
+        if (suite.systemErr!.isNotEmpty && !suite._lastErrorMessageWasEmpty) {
+          suite.systemErr!.write('\n');
+        }
+        suite.systemErr!.write(message);
+        suite._lastErrorMessageWasEmpty = false;
       }
-      suite.systemOut!.write(message);
-      suite._lastMessageWasEmpty = false;
+    } else {
+      // Process as standard output (existing behavior)
+      suite.systemOut ??= StringBuffer();
+
+      // If message is null or empty, treat as newline
+      if (message == null || message.isEmpty) {
+        suite.systemOut!.write('\n');
+        suite._lastMessageWasEmpty = true;
+      } else {
+        // Append separator if buffer is not empty and last message was not empty
+        if (suite.systemOut!.isNotEmpty && !suite._lastMessageWasEmpty) {
+          suite.systemOut!.write('\n');
+        }
+        suite.systemOut!.write(message);
+        suite._lastMessageWasEmpty = false;
+      }
     }
   }
 
@@ -271,14 +293,16 @@ class DefaultDartTestParser implements DartTestParser {
         (sum, test) => sum + test.time,
       );
 
-      // Convert systemOut from StringBuffer to String
+      // Convert systemOut and systemErr from StringBuffer to String
       final systemOut = builder.systemOut?.toString();
+      final systemErr = builder.systemErr?.toString();
 
       final testSuite = TestSuite(
         name: builder.name,
         testCases: builder.testCases,
         time: suiteTime,
         systemOut: systemOut,
+        systemErr: systemErr,
       );
 
       testSuites.add(testSuite);
@@ -328,7 +352,9 @@ class _SuiteBuilder {
   final int id;
   final List<TestCase> testCases = [];
   StringBuffer? systemOut;
+  StringBuffer? systemErr;
   bool _lastMessageWasEmpty = false;
+  bool _lastErrorMessageWasEmpty = false;
 }
 
 class _TestInfo {

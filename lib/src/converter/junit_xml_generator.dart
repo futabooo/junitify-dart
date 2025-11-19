@@ -54,6 +54,13 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
           });
         }
 
+        // System-err element (after system-out, before testcase elements, per JUnit XML schema)
+        if (suite.systemErr != null && suite.systemErr!.isNotEmpty) {
+          builder.element('system-err', nest: () {
+            builder.text(suite.systemErr!);
+          });
+        }
+
         // Test cases
         for (final testCase in suite.testCases) {
           _buildTestCase(builder, testCase);

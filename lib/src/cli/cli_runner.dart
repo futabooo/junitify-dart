@@ -74,6 +74,7 @@ class DefaultCliRunner implements CliRunner {
       final inputResult = await inputSource.readJson();
 
       if (inputResult.isFailure) {
+        print("ほげほげ");
         final error = InputPhaseError(inputResult.errorOrNull!);
         errorReporter.reportError(error);
         return 1;
