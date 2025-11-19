@@ -91,7 +91,7 @@ class DefaultDartTestParser implements DartTestParser {
             // Global error event
             break;
           case 'print':
-            // Print output, can be ignored for JUnit conversion
+            _processPrintEvent(event, tests, suites);
             break;
         }
       }
@@ -153,6 +153,39 @@ class DefaultDartTestParser implements DartTestParser {
       suiteName: suite.name,
       startTime: event['time'] as int? ?? 0,
     );
+  }
+
+  void _processPrintEvent(
+    Map<String, dynamic> event,
+    Map<int, _TestInfo> tests,
+    Map<String, _SuiteBuilder> suites,
+  ) {
+    final testID = event['testID'] as int?;
+    if (testID == null) return;
+
+    final testInfo = tests[testID];
+    if (testInfo == null) return;
+
+    final suite = suites[testInfo.suiteName];
+    if (suite == null) return;
+
+    final message = event['message'] as String?;
+    
+    // Initialize StringBuffer if null
+    suite.systemOut ??= StringBuffer();
+    
+    // If message is null or empty, treat as newline
+    if (message == null || message.isEmpty) {
+      suite.systemOut!.write('\n');
+      suite._lastMessageWasEmpty = true;
+    } else {
+      // Append separator if buffer is not empty and last message was not empty
+      if (suite.systemOut!.isNotEmpty && !suite._lastMessageWasEmpty) {
+        suite.systemOut!.write('\n');
+      }
+      suite.systemOut!.write(message);
+      suite._lastMessageWasEmpty = false;
+    }
   }
 
   void _processTestDoneEvent(
@@ -238,10 +271,14 @@ class DefaultDartTestParser implements DartTestParser {
         (sum, test) => sum + test.time,
       );
 
+      // Convert systemOut from StringBuffer to String
+      final systemOut = builder.systemOut?.toString();
+
       final testSuite = TestSuite(
         name: builder.name,
         testCases: builder.testCases,
         time: suiteTime,
+        systemOut: systemOut,
       );
 
       testSuites.add(testSuite);
@@ -290,6 +327,8 @@ class _SuiteBuilder {
   final String name;
   final int id;
   final List<TestCase> testCases = [];
+  StringBuffer? systemOut;
+  bool _lastMessageWasEmpty = false;
 }
 
 class _TestInfo {

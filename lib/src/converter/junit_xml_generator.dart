@@ -47,6 +47,13 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('skipped', suite.totalSkipped.toString());
         builder.attribute('time', _formatDuration(suite.time));
 
+        // System-out element (before testcase elements, per JUnit XML schema)
+        if (suite.systemOut != null && suite.systemOut!.isNotEmpty) {
+          builder.element('system-out', nest: () {
+            builder.text(suite.systemOut!);
+          });
+        }
+
         // Test cases
         for (final testCase in suite.testCases) {
           _buildTestCase(builder, testCase);
