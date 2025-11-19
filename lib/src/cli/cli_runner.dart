@@ -86,7 +86,10 @@ class DefaultCliRunner implements CliRunner {
 
       // 2. Parse JSON
       errorReporter.debug('Parsing Dart test JSON');
-      final parseResult = parser.parse(jsonString, errorReporter: errorReporter);
+      final parseResult = parser.parse(
+        jsonString,
+        errorReporter: errorReporter,
+      );
 
       if (parseResult.isFailure) {
         final error = ParsingPhaseError(parseResult.errorOrNull!);

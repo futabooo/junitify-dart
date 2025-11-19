@@ -7,6 +7,7 @@ class TestSuite {
     required this.name,
     required this.testCases,
     required this.time,
+    this.systemOut,
   });
 
   /// The name of the test suite (usually file path).
@@ -17,6 +18,10 @@ class TestSuite {
 
   /// The total execution time for this suite.
   final Duration time;
+
+  /// Standard output from all print events in this test suite.
+  /// Contains all print outputs joined by newlines in chronological order.
+  final String? systemOut;
 
   /// Returns the number of tests in this suite.
   int get totalTests => testCases.length;
@@ -39,10 +44,12 @@ class TestSuite {
       other is TestSuite &&
           name == other.name &&
           _listEquals(testCases, other.testCases) &&
-          time == other.time;
+          time == other.time &&
+          systemOut == other.systemOut;
 
   @override
-  int get hashCode => Object.hash(name, Object.hashAll(testCases), time);
+  int get hashCode =>
+      Object.hash(name, Object.hashAll(testCases), time, systemOut);
 
   @override
   String toString() =>

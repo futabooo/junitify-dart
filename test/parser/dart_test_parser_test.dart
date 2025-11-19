@@ -147,6 +147,129 @@ void main() {
         expect(testResult.suites.first.testCases.first.name, equals('visible test'));
       });
 
+    group('print event support', () {
+      test('collects print events and adds to systemOut', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test with output","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"First output line","messageType":"print","time":50}
+{"type":"print","testID":1,"message":"Second output line","messageType":"print","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        expect(testResult.suites.length, equals(1));
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNotNull);
+        expect(suite.systemOut, equals('First output line\nSecond output line'));
+      });
+
+      test('handles empty message in print event', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test with empty output","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"","messageType":"print","time":50}
+{"type":"print","testID":1,"message":"Non-empty line","messageType":"print","time":100}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, equals('\nNon-empty line'));
+      });
+
+      test('ignores print event when testID is missing', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","message":"Output without testID","messageType":"print","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNull);
+      });
+
+      test('ignores print event when testID does not match any test', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":999,"message":"Output for non-existent test","messageType":"print","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNull);
+      });
+
+      test('handles missing message field in print event', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
+{"type":"print","testID":1,"messageType":"print","time":50}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        // Missing message field is treated as empty string, which becomes a newline
+        expect(suite.systemOut, equals('\n'));
+      });
+
+      test('systemOut is null when no print events exist', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test without output","suiteID":0},"time":0}
+{"type":"testDone","testID":1,"result":"success","time":150}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNull);
+      });
+
+      test('collects print events from multiple tests in same suite', () {
+        const json = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"test 1","suiteID":0},"time":0}
+{"type":"print","testID":1,"message":"Output from test 1","messageType":"print","time":50}
+{"type":"testDone","testID":1,"result":"success","time":100}
+{"type":"testStart","test":{"id":2,"name":"test 2","suiteID":0},"time":100}
+{"type":"print","testID":2,"message":"Output from test 2","messageType":"print","time":150}
+{"type":"testDone","testID":2,"result":"success","time":200}
+''';
+
+        final result = parser.parse(json);
+
+        expect(result.isSuccess, isTrue);
+        final testResult = result.valueOrNull!;
+        final suite = testResult.suites.first;
+        expect(suite.systemOut, isNotNull);
+        expect(suite.systemOut, contains('Output from test 1'));
+        expect(suite.systemOut, contains('Output from test 2'));
+      });
+    });
+
       test('processes test case normally when hidden is false', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
