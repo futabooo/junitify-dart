@@ -1,0 +1,23 @@
+{
+  "feature_name": "testcase-system-out-support",
+  "created_at": "2025-11-20T14:13:06Z",
+  "updated_at": "2025-11-20T14:31:28Z",
+  "language": "ja",
+  "phase": "implementation",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    },
+    "design": {
+      "generated": true,
+      "approved": false
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": true
+}
+

@@ -148,7 +148,7 @@ void main() {
       });
 
     group('print event support', () {
-      test('collects print events and adds to systemOut', () {
+      test('collects print events and adds to test case systemOut', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with output","suiteID":0},"time":0}
@@ -163,8 +163,12 @@ void main() {
         final testResult = result.valueOrNull!;
         expect(testResult.suites.length, equals(1));
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNotNull);
-        expect(suite.systemOut, equals('First output line\nSecond output line'));
+        expect(suite.testCases.length, equals(1));
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, isNotNull);
+        expect(testCase.systemOut, equals('First output line\nSecond output line'));
+        // Suite level systemOut should be null
+        expect(suite.systemOut, isNull);
       });
 
       test('handles empty message in print event', () {
@@ -181,7 +185,8 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, equals('\nNon-empty line'));
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, equals('\nNon-empty line'));
       });
 
       test('ignores print event when testID is missing', () {
@@ -197,7 +202,8 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNull);
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, isNull);
       });
 
       test('ignores print event when testID does not match any test', () {
@@ -213,7 +219,8 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNull);
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, isNull);
       });
 
       test('handles missing message field in print event', () {
@@ -229,8 +236,9 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
+        final testCase = suite.testCases.first;
         // Missing message field is treated as empty string, which becomes a newline
-        expect(suite.systemOut, equals('\n'));
+        expect(testCase.systemOut, equals('\n'));
       });
 
       test('systemOut is null when no print events exist', () {
@@ -245,7 +253,8 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNull);
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, isNull);
       });
 
       test('collects print events from multiple tests in same suite', () {
@@ -264,14 +273,16 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNotNull);
-        expect(suite.systemOut, contains('Output from test 1'));
-        expect(suite.systemOut, contains('Output from test 2'));
+        expect(suite.testCases.length, equals(2));
+        expect(suite.testCases[0].systemOut, equals('Output from test 1'));
+        expect(suite.testCases[1].systemOut, equals('Output from test 2'));
+        // Suite level systemOut should be null
+        expect(suite.systemOut, isNull);
       });
     });
 
     group('error output event support', () {
-      test('collects error output events with messageType stderr', () {
+      test('ignores error output events with messageType stderr (system-err not supported)', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
@@ -286,12 +297,13 @@ void main() {
         final testResult = result.valueOrNull!;
         expect(testResult.suites.length, equals(1));
         final suite = testResult.suites.first;
-        expect(suite.systemErr, isNotNull);
-        expect(suite.systemErr, equals('Error line 1\nError line 2'));
-        expect(suite.systemOut, isNull);
+        final testCase = suite.testCases.first;
+        // system-err is not supported at testcase level, so it should be null
+        expect(testCase.systemOut, isNull);
+        expect(suite.systemErr, isNull);
       });
 
-      test('collects error output events with messageType error', () {
+      test('ignores error output events with messageType error (system-err not supported)', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
@@ -304,11 +316,13 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemErr, isNotNull);
-        expect(suite.systemErr, equals('Error message'));
+        final testCase = suite.testCases.first;
+        // system-err is not supported at testcase level, so it should be null
+        expect(testCase.systemOut, isNull);
+        expect(suite.systemErr, isNull);
       });
 
-      test('handles empty message in error output event', () {
+      test('ignores error output events (system-err not supported)', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with empty error","suiteID":0},"time":0}
@@ -322,7 +336,10 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemErr, equals('\nNon-empty error'));
+        final testCase = suite.testCases.first;
+        // system-err is not supported at testcase level, so it should be null
+        expect(testCase.systemOut, isNull);
+        expect(suite.systemErr, isNull);
       });
 
       test('ignores error output event when testID is missing', () {
@@ -357,7 +374,7 @@ void main() {
         expect(suite.systemErr, isNull);
       });
 
-      test('handles missing message field in error output event', () {
+      test('ignores error output events with missing message (system-err not supported)', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
@@ -370,8 +387,10 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        // Missing message field is treated as empty string, which becomes a newline
-        expect(suite.systemErr, equals('\n'));
+        final testCase = suite.testCases.first;
+        // system-err is not supported at testcase level, so it should be null
+        expect(testCase.systemOut, isNull);
+        expect(suite.systemErr, isNull);
       });
 
       test('systemErr is null when no error output events exist', () {
@@ -403,13 +422,15 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, isNotNull);
-        expect(suite.systemOut, contains('Output line'));
-        expect(suite.systemOut, contains('Another output'));
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, isNotNull);
+        expect(testCase.systemOut, contains('Output line'));
+        expect(testCase.systemOut, contains('Another output'));
+        expect(suite.systemOut, isNull);
         expect(suite.systemErr, isNull);
       });
 
-      test('collects both systemOut and systemErr from different events', () {
+      test('collects systemOut but ignores systemErr (system-err not supported)', () {
         const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
@@ -423,8 +444,10 @@ void main() {
         expect(result.isSuccess, isTrue);
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
-        expect(suite.systemOut, equals('Output line'));
-        expect(suite.systemErr, equals('Error line'));
+        final testCase = suite.testCases.first;
+        expect(testCase.systemOut, equals('Output line'));
+        // system-err is not supported at testcase level
+        expect(suite.systemErr, isNull);
       });
     });
 
