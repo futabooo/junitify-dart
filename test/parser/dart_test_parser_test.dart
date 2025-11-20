@@ -166,7 +166,7 @@ void main() {
         expect(suite.testCases.length, equals(1));
         final testCase = suite.testCases.first;
         expect(testCase.systemOut, isNotNull);
-        expect(testCase.systemOut, equals('First output line\nSecond output line'));
+        expect(testCase.systemOut, equals('First output line\nSecond output line\n'));
         // Suite level systemOut should be null
         expect(suite.systemOut, isNull);
       });
@@ -186,7 +186,7 @@ void main() {
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
         final testCase = suite.testCases.first;
-        expect(testCase.systemOut, equals('\nNon-empty line'));
+        expect(testCase.systemOut, equals('\nNon-empty line\n'));
       });
 
       test('ignores print event when testID is missing', () {
@@ -274,8 +274,8 @@ void main() {
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
         expect(suite.testCases.length, equals(2));
-        expect(suite.testCases[0].systemOut, equals('Output from test 1'));
-        expect(suite.testCases[1].systemOut, equals('Output from test 2'));
+        expect(suite.testCases[0].systemOut, equals('Output from test 1\n'));
+        expect(suite.testCases[1].systemOut, equals('Output from test 2\n'));
         // Suite level systemOut should be null
         expect(suite.systemOut, isNull);
       });
@@ -445,7 +445,7 @@ void main() {
         final testResult = result.valueOrNull!;
         final suite = testResult.suites.first;
         final testCase = suite.testCases.first;
-        expect(testCase.systemOut, equals('Output line'));
+        expect(testCase.systemOut, equals('Output line\n'));
         // system-err is not supported at testcase level
         expect(suite.systemErr, isNull);
       });

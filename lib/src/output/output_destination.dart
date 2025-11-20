@@ -30,7 +30,14 @@ class FileOutputDestination implements OutputDestination {
       }
 
       // Convert document to pretty-printed string
-      final xmlString = document.toXmlString(pretty: true, indent: '  ');
+      // Pretty-print the whole document, but preserve whitespace (disable pretty) only inside <system-out> elements.
+      // The preserveWhitespace callback returns true for <system-out> tags, so their contents are not reformatted.
+      final xmlString = document.toXmlString(
+        pretty: true,
+        indent: '  ',
+        preserveWhitespace: (node) =>
+            node is XmlElement && node.name.local == 'system-out',
+      );
 
       // Write to file with UTF-8 encoding
       try {
@@ -60,8 +67,8 @@ class StdoutOutputDestination implements OutputDestination {
   @override
   Future<Result<void, OutputError>> writeXml(XmlDocument document) async {
     try {
-      // Convert document to pretty-printed string
-      final xmlString = document.toXmlString(pretty: true, indent: '  ');
+      // Convert document to string (pretty: false to preserve newlines in text content)
+      final xmlString = document.toXmlString(pretty: false);
 
       // Write to stdout
       stdout.writeln(xmlString);

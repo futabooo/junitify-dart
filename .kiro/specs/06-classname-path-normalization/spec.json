@@ -1,0 +1,23 @@
+{
+  "feature_name": "06-classname-path-normalization",
+  "created_at": "2025-11-20T16:14:02Z",
+  "updated_at": "2025-11-20T16:16:46Z",
+  "language": "ja",
+  "phase": "tasks",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    },
+    "design": {
+      "generated": true,
+      "approved": false
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
+

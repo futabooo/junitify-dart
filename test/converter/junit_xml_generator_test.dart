@@ -37,6 +37,7 @@ void main() {
       expect(xmlString, contains('failures="0"'));
       expect(xmlString, contains('<testcase'));
       expect(xmlString, contains('name="example test"'));
+      expect(xmlString, contains('classname="test.example_test"'));
       expect(xmlString, contains('time="0.150"'));
     });
 
@@ -71,6 +72,7 @@ void main() {
       expect(xmlString, contains('message="Expected: true, Actual: false"'));
       expect(xmlString, contains('type="TestFailure"'));
       expect(xmlString, contains('at test/example_test.dart:10'));
+      expect(xmlString, contains('classname="test.example_test"'));
     });
 
     test('includes error element for error test', () {
@@ -101,6 +103,7 @@ void main() {
 
       expect(xmlString, contains('<error'));
       expect(xmlString, contains('type="TestError"'));
+      expect(xmlString, contains('classname="test.example_test"'));
     });
 
     test('includes skipped element for skipped test', () {
@@ -130,6 +133,7 @@ void main() {
 
       expect(xmlString, contains('<skipped'));
       expect(xmlString, contains('skipped="1"'));
+      expect(xmlString, contains('classname="test.example_test"'));
     });
 
     test('handles multiple test suites', () {
@@ -171,6 +175,8 @@ void main() {
 
       expect(xmlString, contains('test/first_test.dart'));
       expect(xmlString, contains('test/second_test.dart'));
+      expect(xmlString, contains('classname="test.first_test"'));
+      expect(xmlString, contains('classname="test.second_test"'));
     });
 
     test('formats time correctly', () {
@@ -199,6 +205,7 @@ void main() {
       final xmlString = xmlDoc.toXmlString();
 
       expect(xmlString, contains('time="1.234"'));
+      expect(xmlString, contains('classname="test.example_test"'));
     });
 
     group('system-out support', () {
@@ -700,6 +707,127 @@ void main() {
           expect(xmlString, isNot(contains('Error from second suite')));
         },
       );
+    });
+
+    group('classname normalization', () {
+      test(
+        'normalizes classname in XML output but does not modify TestCase model',
+        () {
+          const originalClassName = 'test/example_test.dart';
+          final testCase = TestCase(
+            name: 'test',
+            className: originalClassName,
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 150),
+          );
+
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: [testCase],
+                time: const Duration(milliseconds: 150),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          // Verify classname is normalized in XML output
+          expect(xmlString, contains('classname="test.example_test"'));
+
+          // Verify TestCase model is not modified
+          expect(testCase.className, equals(originalClassName));
+        },
+      );
+
+      test('normalizes classname for all test statuses', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'passed test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 100),
+                ),
+                TestCase(
+                  name: 'failed test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 200),
+                  errorMessage: 'Test failed',
+                ),
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 300),
+                  errorMessage: 'Test error',
+                ),
+                TestCase(
+                  name: 'skipped test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.skipped,
+                  time: Duration(milliseconds: 400),
+                ),
+              ],
+              time: const Duration(milliseconds: 1000),
+            ),
+          ],
+          totalTests: 4,
+          totalFailures: 2,
+          totalSkipped: 1,
+          totalTime: const Duration(milliseconds: 1000),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Verify all test cases have normalized classname
+        final classnameCount = 'classname="test.example_test"'
+            .allMatches(xmlString)
+            .length;
+        expect(classnameCount, equals(4));
+      });
+
+      test('does not affect other attributes', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test name',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Verify other attributes are not affected
+        expect(xmlString, contains('name="test name"'));
+        expect(xmlString, contains('time="0.150"'));
+        expect(xmlString, contains('classname="test.example_test"'));
+      });
     });
   });
 }
