@@ -9,6 +9,7 @@ class TestCase {
     required this.time,
     this.errorMessage,
     this.stackTrace,
+    this.systemOut,
   });
 
   /// The name of the test case.
@@ -28,6 +29,10 @@ class TestCase {
 
   /// The stack trace if the test failed or had an error.
   final String? stackTrace;
+
+  /// Standard output from all print events in this test case.
+  /// Contains all print outputs joined by newlines in chronological order.
+  final String? systemOut;
 
   /// Returns true if this test case failed or had an error.
   bool get hasError =>
@@ -50,11 +55,12 @@ class TestCase {
           status == other.status &&
           time == other.time &&
           errorMessage == other.errorMessage &&
-          stackTrace == other.stackTrace;
+          stackTrace == other.stackTrace &&
+          systemOut == other.systemOut;
 
   @override
   int get hashCode =>
-      Object.hash(name, className, status, time, errorMessage, stackTrace);
+      Object.hash(name, className, status, time, errorMessage, stackTrace, systemOut);
 
   @override
   String toString() =>

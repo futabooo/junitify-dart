@@ -66,6 +66,8 @@ class DefaultDartTestParser implements DartTestParser {
     try {
       final suites = <String, _SuiteBuilder>{};
       final tests = <int, _TestInfo>{};
+      // Map to store print messages grouped by testID
+      final printMessages = <int, StringBuffer>{};
 
       for (final event in events) {
         final type = event['type'] as String?;
@@ -82,7 +84,7 @@ class DefaultDartTestParser implements DartTestParser {
             _processTestStartEvent(event, tests, suites);
             break;
           case 'testDone':
-            _processTestDoneEvent(event, tests, suites, errorReporter);
+            _processTestDoneEvent(event, tests, suites, errorReporter, printMessages);
             break;
           case 'done':
             // Test run completed
@@ -91,7 +93,7 @@ class DefaultDartTestParser implements DartTestParser {
             // Global error event
             break;
           case 'print':
-            _processPrintEvent(event, tests, suites);
+            _processPrintEvent(event, printMessages);
             break;
         }
       }
@@ -157,56 +159,30 @@ class DefaultDartTestParser implements DartTestParser {
 
   void _processPrintEvent(
     Map<String, dynamic> event,
-    Map<int, _TestInfo> tests,
-    Map<String, _SuiteBuilder> suites,
+    Map<int, StringBuffer> printMessages,
   ) {
     final testID = event['testID'] as int?;
     if (testID == null) return;
 
-    final testInfo = tests[testID];
-    if (testInfo == null) return;
-
-    final suite = suites[testInfo.suiteName];
-    if (suite == null) return;
-
     final message = event['message'] as String?;
     final messageType = event['messageType'] as String?;
 
-    // Check if this is an error output event
+    // Only process standard output (ignore stderr/error)
     final isErrorOutput = messageType == 'stderr' || messageType == 'error';
+    if (isErrorOutput) return;
 
-    if (isErrorOutput) {
-      // Process as error output
-      suite.systemErr ??= StringBuffer();
+    // Get or create StringBuffer for this testID
+    final buffer = printMessages.putIfAbsent(testID, () => StringBuffer());
 
-      // If message is null or empty, treat as newline
-      if (message == null || message.isEmpty) {
-        suite.systemErr!.write('\n');
-        suite._lastErrorMessageWasEmpty = true;
-      } else {
-        // Append separator if buffer is not empty and last message was not empty
-        if (suite.systemErr!.isNotEmpty && !suite._lastErrorMessageWasEmpty) {
-          suite.systemErr!.write('\n');
-        }
-        suite.systemErr!.write(message);
-        suite._lastErrorMessageWasEmpty = false;
-      }
+    // If message is null or empty, treat as newline
+    if (message == null || message.isEmpty) {
+      buffer.write('\n');
     } else {
-      // Process as standard output (existing behavior)
-      suite.systemOut ??= StringBuffer();
-
-      // If message is null or empty, treat as newline
-      if (message == null || message.isEmpty) {
-        suite.systemOut!.write('\n');
-        suite._lastMessageWasEmpty = true;
-      } else {
-        // Append separator if buffer is not empty and last message was not empty
-        if (suite.systemOut!.isNotEmpty && !suite._lastMessageWasEmpty) {
-          suite.systemOut!.write('\n');
-        }
-        suite.systemOut!.write(message);
-        suite._lastMessageWasEmpty = false;
+      // Append separator if buffer is not empty and doesn't end with newline
+      if (buffer.isNotEmpty && !buffer.toString().endsWith('\n')) {
+        buffer.write('\n');
       }
+      buffer.write(message);
     }
   }
 
@@ -215,6 +191,7 @@ class DefaultDartTestParser implements DartTestParser {
     Map<int, _TestInfo> tests,
     Map<String, _SuiteBuilder> suites,
     ErrorReporter? errorReporter,
+    Map<int, StringBuffer> printMessages,
   ) {
     final testID = event['testID'] as int?;
     if (testID == null) return;
@@ -238,6 +215,8 @@ class DefaultDartTestParser implements DartTestParser {
           'Ignoring hidden test: ${testInfo.suiteName}::${testInfo.name}',
         );
       }
+      // Clean up print messages for hidden test
+      printMessages.remove(testID);
       return;
     }
 
@@ -258,6 +237,10 @@ class DefaultDartTestParser implements DartTestParser {
     // Calculate duration
     final duration = Duration(milliseconds: time - testInfo.startTime);
 
+    // Get print messages for this test case
+    final printBuffer = printMessages.remove(testID);
+    final systemOut = printBuffer?.toString();
+
     // Create test case
     final testCase = TestCase(
       name: testInfo.name,
@@ -266,6 +249,7 @@ class DefaultDartTestParser implements DartTestParser {
       time: duration,
       errorMessage: error,
       stackTrace: stackTrace,
+      systemOut: systemOut,
     );
 
     // Add to suite
@@ -293,16 +277,10 @@ class DefaultDartTestParser implements DartTestParser {
         (sum, test) => sum + test.time,
       );
 
-      // Convert systemOut and systemErr from StringBuffer to String
-      final systemOut = builder.systemOut?.toString();
-      final systemErr = builder.systemErr?.toString();
-
       final testSuite = TestSuite(
         name: builder.name,
         testCases: builder.testCases,
         time: suiteTime,
-        systemOut: systemOut,
-        systemErr: systemErr,
       );
 
       testSuites.add(testSuite);
@@ -351,10 +329,6 @@ class _SuiteBuilder {
   final String name;
   final int id;
   final List<TestCase> testCases = [];
-  StringBuffer? systemOut;
-  StringBuffer? systemErr;
-  bool _lastMessageWasEmpty = false;
-  bool _lastErrorMessageWasEmpty = false;
 }
 
 class _TestInfo {

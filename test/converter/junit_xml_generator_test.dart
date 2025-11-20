@@ -213,10 +213,10 @@ void main() {
                   className: 'test/example_test.dart',
                   status: TestStatus.passed,
                   time: Duration(milliseconds: 150),
+                  systemOut: 'Output line 1\nOutput line 2',
                 ),
               ],
               time: const Duration(milliseconds: 150),
-              systemOut: 'Output line 1\nOutput line 2',
             ),
           ],
           totalTests: 1,
@@ -231,6 +231,10 @@ void main() {
         expect(xmlString, contains('<system-out>'));
         expect(xmlString, contains('Output line 1\nOutput line 2'));
         expect(xmlString, contains('</system-out>'));
+        // Verify it's inside testcase element, not testsuite
+        final testcaseIndex = xmlString.indexOf('<testcase');
+        final systemOutIndex = xmlString.indexOf('<system-out>');
+        expect(systemOutIndex, greaterThan(testcaseIndex));
       });
 
       test('does not generate system-out tag when systemOut is null', () {
@@ -272,10 +276,10 @@ void main() {
                   className: 'test/example_test.dart',
                   status: TestStatus.passed,
                   time: Duration(milliseconds: 150),
+                  systemOut: '',
                 ),
               ],
               time: const Duration(milliseconds: 150),
-              systemOut: '',
             ),
           ],
           totalTests: 1,
@@ -301,10 +305,10 @@ void main() {
                   className: 'test/example_test.dart',
                   status: TestStatus.passed,
                   time: Duration(milliseconds: 150),
+                  systemOut: 'Text with <tags> & "quotes"',
                 ),
               ],
               time: const Duration(milliseconds: 150),
-              systemOut: 'Text with <tags> & "quotes"',
             ),
           ],
           totalTests: 1,
@@ -325,7 +329,53 @@ void main() {
         expect(xmlString, contains('Text with'));
       });
 
-      test('places system-out tag before testcase elements', () {
+      test(
+        'places system-out tag inside testcase element before status-specific elements',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test 1',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 100),
+                    systemOut: 'Test output',
+                  ),
+                  TestCase(
+                    name: 'test 2',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.failed,
+                    time: Duration(milliseconds: 200),
+                    errorMessage: 'Test failed',
+                  ),
+                ],
+                time: const Duration(milliseconds: 300),
+              ),
+            ],
+            totalTests: 2,
+            totalFailures: 1,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 300),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          // Find positions for first testcase
+          final firstTestcaseIndex = xmlString.indexOf('name="test 1"');
+          final systemOutIndex = xmlString.indexOf('<system-out>');
+          final failureIndex = xmlString.indexOf('<failure');
+
+          expect(systemOutIndex, greaterThan(firstTestcaseIndex));
+          // system-out should be before failure element
+          expect(systemOutIndex, lessThan(failureIndex));
+        },
+      );
+
+      test('generates system-out for each test case independently', () {
         final testResult = DartTestResult(
           suites: [
             TestSuite(
@@ -336,16 +386,17 @@ void main() {
                   className: 'test/example_test.dart',
                   status: TestStatus.passed,
                   time: Duration(milliseconds: 100),
+                  systemOut: 'Output from first test',
                 ),
                 TestCase(
                   name: 'test 2',
                   className: 'test/example_test.dart',
                   status: TestStatus.passed,
                   time: Duration(milliseconds: 200),
+                  systemOut: 'Output from second test',
                 ),
               ],
               time: const Duration(milliseconds: 300),
-              systemOut: 'Suite output',
             ),
           ],
           totalTests: 2,
@@ -357,64 +408,50 @@ void main() {
         final xmlDoc = generator.convert(testResult);
         final xmlString = xmlDoc.toXmlString();
 
-        // Find positions
-        final systemOutIndex = xmlString.indexOf('<system-out>');
-        final firstTestCaseIndex = xmlString.indexOf('<testcase');
-
-        expect(systemOutIndex, greaterThan(-1));
-        expect(firstTestCaseIndex, greaterThan(-1));
-        expect(systemOutIndex, lessThan(firstTestCaseIndex));
-      });
-
-      test('generates system-out for each suite independently', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/first_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test 1',
-                  className: 'test/first_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 100),
-                ),
-              ],
-              time: const Duration(milliseconds: 100),
-              systemOut: 'Output from first suite',
-            ),
-            TestSuite(
-              name: 'test/second_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test 2',
-                  className: 'test/second_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 200),
-                ),
-              ],
-              time: const Duration(milliseconds: 200),
-              systemOut: 'Output from second suite',
-            ),
-          ],
-          totalTests: 2,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 300),
-        );
-
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
-
-        expect(xmlString, contains('Output from first suite'));
-        expect(xmlString, contains('Output from second suite'));
+        expect(xmlString, contains('Output from first test'));
+        expect(xmlString, contains('Output from second test'));
         // Count system-out tags
         final systemOutCount = '<system-out>'.allMatches(xmlString).length;
         expect(systemOutCount, equals(2));
       });
+
+      test('does not generate system-out tag at testsuite level', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test without output',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+              systemOut: 'Suite output that should be ignored',
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Should not contain system-out tag (testsuite level is ignored)
+        expect(xmlString, isNot(contains('<system-out>')));
+        expect(
+          xmlString,
+          isNot(contains('Suite output that should be ignored')),
+        );
+      });
     });
 
     group('system-err support', () {
-      test('generates system-err tag when systemErr is not null', () {
+      test('does not generate system-err tag at testsuite level', () {
         final testResult = DartTestResult(
           suites: [
             TestSuite(
@@ -440,9 +477,9 @@ void main() {
         final xmlDoc = generator.convert(testResult);
         final xmlString = xmlDoc.toXmlString();
 
-        expect(xmlString, contains('<system-err>'));
-        expect(xmlString, contains('Error line 1\nError line 2'));
-        expect(xmlString, contains('</system-err>'));
+        // Should not contain system-err tag (testsuite level is ignored)
+        expect(xmlString, isNot(contains('<system-err>')));
+        expect(xmlString, isNot(contains('Error line 1\nError line 2')));
       });
 
       test('does not generate system-err tag when systemErr is null', () {
@@ -502,163 +539,167 @@ void main() {
         expect(xmlString, isNot(contains('<system-err>')));
       });
 
-      test('escapes XML special characters in system-err', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/example_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test with special chars',
-                  className: 'test/example_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 150),
-                ),
-              ],
-              time: const Duration(milliseconds: 150),
-              systemErr: 'Error with <tags> & "quotes"',
-            ),
-          ],
-          totalTests: 1,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 150),
-        );
+      test(
+        'does not generate system-err tag at testsuite level (system-err not supported)',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test with special chars',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+                systemErr: 'Error with <tags> & "quotes"',
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
 
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
 
-        expect(xmlString, contains('<system-err>'));
-        // XML package automatically escapes, so we check the escaped version
-        expect(xmlString, contains('&lt;tags'));
-        expect(xmlString, contains('&amp;'));
-        // Verify the content is properly escaped (not breaking XML)
-        expect(xmlString, contains('Error with'));
-      });
+          // Should not contain system-err tag (testsuite level is ignored)
+          expect(xmlString, isNot(contains('<system-err>')));
+          expect(xmlString, isNot(contains('Error with')));
+        },
+      );
 
-      test('places system-err tag after system-out and before testcase elements', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/example_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test 1',
-                  className: 'test/example_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 100),
-                ),
-                TestCase(
-                  name: 'test 2',
-                  className: 'test/example_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 200),
-                ),
-              ],
-              time: const Duration(milliseconds: 300),
-              systemOut: 'Suite output',
-              systemErr: 'Suite error',
-            ),
-          ],
-          totalTests: 2,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 300),
-        );
+      test(
+        'does not generate system-err tag at testsuite level even when both systemOut and systemErr exist',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test 1',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 100),
+                  ),
+                  TestCase(
+                    name: 'test 2',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 200),
+                  ),
+                ],
+                time: const Duration(milliseconds: 300),
+                systemOut: 'Suite output',
+                systemErr: 'Suite error',
+              ),
+            ],
+            totalTests: 2,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 300),
+          );
 
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
 
-        // Find positions
-        final systemOutIndex = xmlString.indexOf('<system-out>');
-        final systemErrIndex = xmlString.indexOf('<system-err>');
-        final firstTestCaseIndex = xmlString.indexOf('<testcase');
+          // Should not contain system-err tag (testsuite level is ignored)
+          expect(xmlString, isNot(contains('<system-err>')));
+          expect(xmlString, isNot(contains('Suite error')));
+          // system-out at testsuite level should also be ignored
+          expect(xmlString, isNot(contains('Suite output')));
+        },
+      );
 
-        expect(systemOutIndex, greaterThan(-1));
-        expect(systemErrIndex, greaterThan(-1));
-        expect(firstTestCaseIndex, greaterThan(-1));
-        expect(systemOutIndex, lessThan(systemErrIndex));
-        expect(systemErrIndex, lessThan(firstTestCaseIndex));
-      });
+      test(
+        'does not generate system-err tag at testsuite level (system-err not supported)',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+                systemOut: 'Output line',
+                systemErr: 'Error line',
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
 
-      test('generates both system-out and system-err tags when both exist', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/example_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test',
-                  className: 'test/example_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 150),
-                ),
-              ],
-              time: const Duration(milliseconds: 150),
-              systemOut: 'Output line',
-              systemErr: 'Error line',
-            ),
-          ],
-          totalTests: 1,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 150),
-        );
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
 
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
+          // Should not contain system-err tag (testsuite level is ignored)
+          expect(xmlString, isNot(contains('<system-err>')));
+          expect(xmlString, isNot(contains('Error line')));
+          // system-out at testsuite level should also be ignored
+          expect(xmlString, isNot(contains('Output line')));
+        },
+      );
 
-        expect(xmlString, contains('<system-out>'));
-        expect(xmlString, contains('Output line'));
-        expect(xmlString, contains('<system-err>'));
-        expect(xmlString, contains('Error line'));
-      });
+      test(
+        'does not generate system-err tag at testsuite level for multiple suites',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/first_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test 1',
+                    className: 'test/first_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 100),
+                  ),
+                ],
+                time: const Duration(milliseconds: 100),
+                systemErr: 'Error from first suite',
+              ),
+              TestSuite(
+                name: 'test/second_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test 2',
+                    className: 'test/second_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 200),
+                  ),
+                ],
+                time: const Duration(milliseconds: 200),
+                systemErr: 'Error from second suite',
+              ),
+            ],
+            totalTests: 2,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 300),
+          );
 
-      test('generates system-err for each suite independently', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/first_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test 1',
-                  className: 'test/first_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 100),
-                ),
-              ],
-              time: const Duration(milliseconds: 100),
-              systemErr: 'Error from first suite',
-            ),
-            TestSuite(
-              name: 'test/second_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test 2',
-                  className: 'test/second_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 200),
-                ),
-              ],
-              time: const Duration(milliseconds: 200),
-              systemErr: 'Error from second suite',
-            ),
-          ],
-          totalTests: 2,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 300),
-        );
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
 
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
-
-        expect(xmlString, contains('Error from first suite'));
-        expect(xmlString, contains('Error from second suite'));
-        // Count system-err tags
-        final systemErrCount = '<system-err>'.allMatches(xmlString).length;
-        expect(systemErrCount, equals(2));
-      });
+          // Should not contain system-err tag (testsuite level is ignored)
+          expect(xmlString, isNot(contains('<system-err>')));
+          expect(xmlString, isNot(contains('Error from first suite')));
+          expect(xmlString, isNot(contains('Error from second suite')));
+        },
+      );
     });
   });
 }

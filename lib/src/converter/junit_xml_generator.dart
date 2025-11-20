@@ -47,20 +47,6 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('skipped', suite.totalSkipped.toString());
         builder.attribute('time', _formatDuration(suite.time));
 
-        // System-out element (before testcase elements, per JUnit XML schema)
-        if (suite.systemOut != null && suite.systemOut!.isNotEmpty) {
-          builder.element('system-out', nest: () {
-            builder.text(suite.systemOut!);
-          });
-        }
-
-        // System-err element (after system-out, before testcase elements, per JUnit XML schema)
-        if (suite.systemErr != null && suite.systemErr!.isNotEmpty) {
-          builder.element('system-err', nest: () {
-            builder.text(suite.systemErr!);
-          });
-        }
-
         // Test cases
         for (final testCase in suite.testCases) {
           _buildTestCase(builder, testCase);
@@ -77,6 +63,13 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('name', testCase.name);
         builder.attribute('classname', testCase.className);
         builder.attribute('time', _formatDuration(testCase.time));
+
+        // System-out element (before status-specific elements, per JUnit XML schema)
+        if (testCase.systemOut != null && testCase.systemOut!.isNotEmpty) {
+          builder.element('system-out', nest: () {
+            builder.text(testCase.systemOut!);
+          });
+        }
 
         // Status-specific elements
         switch (testCase.status) {
