@@ -178,11 +178,12 @@ class DefaultDartTestParser implements DartTestParser {
     if (message == null || message.isEmpty) {
       buffer.write('\n');
     } else {
-      // Append separator if buffer is not empty and doesn't end with newline
-      if (buffer.isNotEmpty && !buffer.toString().endsWith('\n')) {
+      // Write message and ensure it ends with a newline
+      buffer.write(message);
+      // Add newline if message doesn't already end with one
+      if (!message.endsWith('\n')) {
         buffer.write('\n');
       }
-      buffer.write(message);
     }
   }
 

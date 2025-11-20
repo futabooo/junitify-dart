@@ -61,7 +61,7 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
       nest: () {
         // Attributes
         builder.attribute('name', testCase.name);
-        builder.attribute('classname', testCase.className);
+        builder.attribute('classname', _normalizeClassName(testCase.className));
         builder.attribute('time', _formatDuration(testCase.time));
 
         // System-out element (before status-specific elements, per JUnit XML schema)
@@ -131,5 +131,60 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
   String _formatDuration(Duration duration) {
     // Convert to seconds with millisecond precision
     return (duration.inMilliseconds / 1000.0).toStringAsFixed(3);
+  }
+
+  /// Normalizes a classname string by converting slashes to dots and removing the extension.
+  ///
+  /// Converts slashes (`/`) to dots (`.`) and removes the last extension part (e.g., `.dart`).
+  ///
+  /// Examples:
+  ///   - `test/example_test.dart` → `test.example_test`
+  ///   - `lib/src/converter/junit_xml_generator.dart` → `lib.src.converter.junit_xml_generator`
+  ///   - `test/example_test` → `test.example_test`
+  ///   - `example_test.dart` → `example_test`
+  ///   - `example_test` → `example_test`
+  ///   - `///` → `` (empty string)
+  ///   - `/test/example.dart` → `.test.example`
+  ///   - `test/example/` → `test.example.`
+  ///   - `test//example.dart` → `test..example`
+  ///
+  /// Parameters:
+  ///   [className] - The classname string to normalize
+  ///
+  /// Returns:
+  ///   The normalized classname string
+  String _normalizeClassName(String className) {
+    // Handle empty string
+    if (className.isEmpty) {
+      return className;
+    }
+
+    // Replace all slashes with dots
+    var normalized = className.replaceAll('/', '.');
+
+    // Remove the extension (last dot and everything after it)
+    // Only remove if there's at least one character after the last dot
+    final lastDotIndex = normalized.lastIndexOf('.');
+    if (lastDotIndex != -1 && lastDotIndex < normalized.length - 1) {
+      // Check if the part after the last dot looks like an extension
+      // (contains only alphanumeric characters, typical for file extensions)
+      final afterLastDot = normalized.substring(lastDotIndex + 1);
+      if (afterLastDot.isNotEmpty &&
+          afterLastDot.codeUnits.every((code) =>
+              (code >= 48 && code <= 57) || // 0-9
+              (code >= 65 && code <= 90) || // A-Z
+              (code >= 97 && code <= 122))) {
+        // It's likely an extension, remove it
+        normalized = normalized.substring(0, lastDotIndex);
+      }
+    }
+
+    // Handle edge case: if result is only dots (e.g., `///` → `...` → ``)
+    // or if result becomes empty after extension removal
+    if (normalized.isEmpty || normalized.codeUnits.every((code) => code == 46)) {
+      return '';
+    }
+
+    return normalized;
   }
 }
