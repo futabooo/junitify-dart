@@ -69,6 +69,8 @@ class DefaultDartTestParser implements DartTestParser {
       final tests = <int, _TestInfo>{};
       // Map to store print messages grouped by testID
       final printMessages = <int, StringBuffer>{};
+      // Map to store error information grouped by testID
+      final testErrors = <int, Map<String, String?>>{};
 
       for (final event in events) {
         final type = event['type'] as String?;
@@ -91,13 +93,14 @@ class DefaultDartTestParser implements DartTestParser {
               suites,
               errorReporter,
               printMessages,
+              testErrors,
             );
             break;
           case 'done':
             // Test run completed
             break;
           case 'error':
-            // Global error event
+            _processErrorEvent(event, testErrors);
             break;
           case 'print':
             _processPrintEvent(event, printMessages);
@@ -282,12 +285,36 @@ class DefaultDartTestParser implements DartTestParser {
     }
   }
 
+  void _processErrorEvent(
+    Map<String, dynamic> event,
+    Map<int, Map<String, String?>> testErrors,
+  ) {
+    final testID = event['testID'] as int?;
+    if (testID == null) return;
+
+    // Extract error field, converting empty strings to null and non-strings to null
+    final errorValue = event['error'];
+    final error = errorValue is String && errorValue.isNotEmpty
+        ? errorValue
+        : null;
+
+    // Extract stackTrace field, converting empty strings to null and non-strings to null
+    final stackTraceValue = event['stackTrace'];
+    final stackTrace = stackTraceValue is String && stackTraceValue.isNotEmpty
+        ? stackTraceValue
+        : null;
+
+    // Store error information for this testID
+    testErrors[testID] = {'error': error, 'stackTrace': stackTrace};
+  }
+
   void _processTestDoneEvent(
     Map<String, dynamic> event,
     Map<int, _TestInfo> tests,
     Map<String, _SuiteBuilder> suites,
     ErrorReporter? errorReporter,
     Map<int, StringBuffer> printMessages,
+    Map<int, Map<String, String?>> testErrors,
   ) {
     final testID = event['testID'] as int?;
     if (testID == null) return;
@@ -301,8 +328,16 @@ class DefaultDartTestParser implements DartTestParser {
     final hiddenValue = event['hidden'];
     final hidden = hiddenValue is bool ? hiddenValue : false;
     final time = event['time'] as int? ?? 0;
-    final error = event['error'] as String?;
-    final stackTrace = event['stackTrace'] as String?;
+
+    // Get error information from testDone event or from error event
+    final errorFromDone = event['error'] as String?;
+    final stackTraceFromDone = event['stackTrace'] as String?;
+    final errorInfo = testErrors[testID];
+    final error = errorFromDone ?? errorInfo?['error'];
+    final stackTrace = stackTraceFromDone ?? errorInfo?['stackTrace'];
+
+    // Clean up error info after use
+    testErrors.remove(testID);
 
     // If hidden is true, skip test case creation completely
     if (hidden) {
@@ -331,7 +366,9 @@ class DefaultDartTestParser implements DartTestParser {
     }
 
     // Calculate duration
-    final duration = Duration(milliseconds: time - testInfo.startTime);
+    // Ensure duration is non-negative (handle edge cases where time might be less than startTime)
+    final durationMs = time - testInfo.startTime;
+    final duration = Duration(milliseconds: durationMs >= 0 ? durationMs : 0);
 
     // Get print messages for this test case
     final printBuffer = printMessages.remove(testID);
@@ -412,9 +449,56 @@ class DefaultDartTestParser implements DartTestParser {
     );
 
     if (!result.isValid) {
-      return const Failure(
-        InvalidFormatError('result', 'Invalid test result data'),
+      // Debug: Check which validation failed
+      final actualTests = result.suites.fold<int>(
+        0,
+        (sum, suite) => sum + suite.totalTests,
       );
+      final actualFailures = result.suites.fold<int>(
+        0,
+        (sum, suite) => sum + suite.totalFailures + suite.totalErrors,
+      );
+      final actualSkipped = result.suites.fold<int>(
+        0,
+        (sum, suite) => sum + suite.totalSkipped,
+      );
+
+      String reason = 'Invalid test result data';
+      if (result.totalTests != actualTests) {
+        reason =
+            'totalTests mismatch: expected ${result.totalTests}, got $actualTests';
+      } else if (result.totalFailures != actualFailures) {
+        reason =
+            'totalFailures mismatch: expected ${result.totalFailures}, got $actualFailures';
+      } else if (result.totalSkipped != actualSkipped) {
+        reason =
+            'totalSkipped mismatch: expected ${result.totalSkipped}, got $actualSkipped';
+      } else if (result.totalTime.isNegative) {
+        reason = 'totalTime is negative: ${result.totalTime.inMilliseconds}ms';
+      } else {
+        // Check for negative durations or invalid test cases
+        for (final suite in result.suites) {
+          if (suite.time.isNegative) {
+            reason =
+                'Suite time is negative: ${suite.name} has ${suite.time.inMilliseconds}ms';
+            break;
+          }
+          for (final testCase in suite.testCases) {
+            if (testCase.time.isNegative) {
+              reason =
+                  'Test case time is negative: ${testCase.name} has ${testCase.time.inMilliseconds}ms';
+              break;
+            }
+            if (!testCase.isValid) {
+              reason =
+                  'Test case is invalid: ${testCase.name} (status: ${testCase.status}, hasError: ${testCase.hasError}, errorMessage: ${testCase.errorMessage})';
+              break;
+            }
+          }
+        }
+      }
+
+      return Failure(InvalidFormatError('result', reason));
     }
 
     return Success(result);
