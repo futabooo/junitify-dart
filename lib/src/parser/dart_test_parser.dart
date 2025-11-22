@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import '../common/error.dart';
 import '../common/result.dart';
@@ -84,7 +85,13 @@ class DefaultDartTestParser implements DartTestParser {
             _processTestStartEvent(event, tests, suites);
             break;
           case 'testDone':
-            _processTestDoneEvent(event, tests, suites, errorReporter, printMessages);
+            _processTestDoneEvent(
+              event,
+              tests,
+              suites,
+              errorReporter,
+              printMessages,
+            );
             break;
           case 'done':
             // Test run completed
@@ -144,17 +151,105 @@ class DefaultDartTestParser implements DartTestParser {
       return;
     }
 
+    // Skip if testInfo already exists (use first event's information)
+    if (tests.containsKey(id)) {
+      return;
+    }
+
     final suite = suites.values.firstWhere(
       (s) => s.id == suiteID,
       orElse: () => _SuiteBuilder(name: 'unknown', id: suiteID),
     );
+
+    // Extract file and line from testStart event
+    final url = test['url'] as String?;
+    final file = _extractFilePathFromUrl(url);
+    final line = _extractLineNumber(test['line']);
 
     tests[id] = _TestInfo(
       id: id,
       name: name,
       suiteName: suite.name,
       startTime: event['time'] as int? ?? 0,
+      file: file,
+      line: line,
     );
+  }
+
+  /// Extracts a file path from a URL string.
+  ///
+  /// Converts `file://` URI format to a file path.
+  /// Returns null if the URL is not a `file://` URI or is invalid.
+  ///
+  /// Examples:
+  ///   - `file:///home/user/project/test.dart` → `/home/user/project/test.dart`
+  ///   - `file:///C:/Users/project/test.dart` → `C:/Users/project/test.dart` (Windows)
+  ///   - `http://example.com/test.dart` → null
+  ///   - `null` → null
+  ///   - `""` → null
+  String? _extractFilePathFromUrl(String? url) {
+    if (url == null || url.isEmpty) {
+      return null;
+    }
+
+    // Only process file:// URIs
+    if (!url.startsWith('file://')) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.parse(url);
+      if (uri.scheme != 'file') {
+        return null;
+      }
+
+      // Get the file path from URI
+      final path = uri.toFilePath(windows: Platform.isWindows);
+
+      // Try to convert absolute path to relative path if possible
+      // For now, we'll return the absolute path as-is
+      // Future enhancement: convert to relative path based on current working directory
+      return path;
+    } catch (e) {
+      // If URI parsing fails, return null
+      return null;
+    }
+  }
+
+  /// Extracts a line number from a dynamic value.
+  ///
+  /// Converts various types to an integer line number.
+  /// Returns null if the value is invalid (negative, non-numeric, etc.).
+  ///
+  /// Examples:
+  ///   - `28` → `28`
+  ///   - `"28"` → `28`
+  ///   - `0` → `0` (valid, as per requirement 5.4)
+  ///   - `-1` → `null` (invalid, negative)
+  ///   - `null` → `null`
+  ///   - `true` → `null` (invalid type)
+  int? _extractLineNumber(dynamic lineValue) {
+    if (lineValue == null) {
+      return null;
+    }
+
+    // Handle integer directly
+    if (lineValue is int) {
+      // Allow 0 as valid value (requirement 5.4)
+      return lineValue >= 0 ? lineValue : null;
+    }
+
+    // Handle string that contains a number
+    if (lineValue is String) {
+      if (lineValue.isEmpty) {
+        return null;
+      }
+      final parsed = int.tryParse(lineValue);
+      return parsed != null && parsed >= 0 ? parsed : null;
+    }
+
+    // Invalid type
+    return null;
   }
 
   void _processPrintEvent(
@@ -251,6 +346,8 @@ class DefaultDartTestParser implements DartTestParser {
       errorMessage: error,
       stackTrace: stackTrace,
       systemOut: systemOut,
+      file: testInfo.file,
+      line: testInfo.line,
     );
 
     // Add to suite
@@ -338,10 +435,14 @@ class _TestInfo {
     required this.name,
     required this.suiteName,
     required this.startTime,
+    this.file,
+    this.line,
   });
 
   final int id;
   final String name;
   final String suiteName;
   final int startTime;
+  final String? file;
+  final int? line;
 }
