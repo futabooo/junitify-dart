@@ -64,6 +64,14 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('classname', _normalizeClassName(testCase.className));
         builder.attribute('time', _formatDuration(testCase.time));
 
+        // File and line attributes
+        if (testCase.file != null) {
+          builder.attribute('file', testCase.file!);
+        }
+        if (testCase.line != null) {
+          builder.attribute('line', testCase.line!.toString());
+        }
+
         // System-out element (before status-specific elements, per JUnit XML schema)
         if (testCase.systemOut != null && testCase.systemOut!.isNotEmpty) {
           builder.element('system-out', nest: () {

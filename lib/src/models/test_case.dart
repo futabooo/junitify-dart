@@ -10,6 +10,8 @@ class TestCase {
     this.errorMessage,
     this.stackTrace,
     this.systemOut,
+    this.file,
+    this.line,
   });
 
   /// The name of the test case.
@@ -34,6 +36,12 @@ class TestCase {
   /// Contains all print outputs joined by newlines in chronological order.
   final String? systemOut;
 
+  /// The source file path where this test case is defined.
+  final String? file;
+
+  /// The line number in the source file where this test case is defined.
+  final int? line;
+
   /// Returns true if this test case failed or had an error.
   bool get hasError =>
       status == TestStatus.failed || status == TestStatus.error;
@@ -56,11 +64,13 @@ class TestCase {
           time == other.time &&
           errorMessage == other.errorMessage &&
           stackTrace == other.stackTrace &&
-          systemOut == other.systemOut;
+          systemOut == other.systemOut &&
+          file == other.file &&
+          line == other.line;
 
   @override
   int get hashCode =>
-      Object.hash(name, className, status, time, errorMessage, stackTrace, systemOut);
+      Object.hash(name, className, status, time, errorMessage, stackTrace, systemOut, file, line);
 
   @override
   String toString() =>
