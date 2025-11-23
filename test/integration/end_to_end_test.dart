@@ -333,5 +333,122 @@ void main() {
       expect(content, contains('Error from testDone'));
       expect(content, isNot(contains('Error from error event')));
     });
+
+    test('failure element has correct format with AssertionError type', () async {
+      final inputFile = File('${tempDir.path}/input.json');
+      const inputJson = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"failing test","suiteID":0},"time":0}
+{"type":"error","testID":1,"error":"Assertion error message","stackTrace":"package:matcher expect\\ntest/example_test.dart 10:7  main.<fn>","time":50}
+{"type":"testDone","testID":1,"result":"failure","time":100}
+{"type":"done"}
+''';
+      await inputFile.writeAsString(inputJson);
+
+      final inputSource = FileInputSource(inputFile.path);
+      final inputResult = await inputSource.readJson();
+      expect(inputResult.isSuccess, isTrue);
+
+      const parser = DefaultDartTestParser();
+      final parseResult = parser.parse(inputResult.valueOrNull!);
+      expect(parseResult.isSuccess, isTrue);
+
+      const generator = DefaultJUnitXmlGenerator();
+      final xmlDoc = generator.convert(parseResult.valueOrNull!);
+
+      final outputFile = File('${tempDir.path}/output.xml');
+      final outputDest = FileOutputDestination(outputFile.path);
+      final outputResult = await outputDest.writeXml(xmlDoc);
+      expect(outputResult.isSuccess, isTrue);
+
+      final content = await outputFile.readAsString();
+      expect(content, contains('<failure'));
+      expect(content, contains('type="AssertionError"'));
+      expect(content, contains('message="1 failure, see stacktrace for details"'));
+      expect(content, contains('Failure:'));
+      expect(content, contains('Assertion error message'));
+    });
+
+    test('error element has correct format with AssertionError type', () async {
+      final inputFile = File('${tempDir.path}/input.json');
+      const inputJson = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"error test","suiteID":0},"time":0}
+{"type":"error","testID":1,"error":"Exception: Something went wrong","stackTrace":"package:test expect\\ntest/example_test.dart 10:7  main.<fn>","time":50}
+{"type":"testDone","testID":1,"result":"error","time":100}
+{"type":"done"}
+''';
+      await inputFile.writeAsString(inputJson);
+
+      final inputSource = FileInputSource(inputFile.path);
+      final inputResult = await inputSource.readJson();
+      expect(inputResult.isSuccess, isTrue);
+
+      const parser = DefaultDartTestParser();
+      final parseResult = parser.parse(inputResult.valueOrNull!);
+      expect(parseResult.isSuccess, isTrue);
+
+      const generator = DefaultJUnitXmlGenerator();
+      final xmlDoc = generator.convert(parseResult.valueOrNull!);
+
+      final outputFile = File('${tempDir.path}/output.xml');
+      final outputDest = FileOutputDestination(outputFile.path);
+      final outputResult = await outputDest.writeXml(xmlDoc);
+      expect(outputResult.isSuccess, isTrue);
+
+      final content = await outputFile.readAsString();
+      expect(content, contains('<error'));
+      expect(content, contains('type="AssertionError"'));
+      expect(content, contains('message="1 error, see stacktrace for details"'));
+      expect(content, contains('Error:'));
+      expect(content, contains('Exception: Something went wrong'));
+    });
+
+    test('handles multiple tests with failure and error elements', () async {
+      final inputFile = File('${tempDir.path}/input.json');
+      const inputJson = '''
+{"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
+{"type":"testStart","test":{"id":1,"name":"failing test","suiteID":0},"time":0}
+{"type":"error","testID":1,"error":"Assertion error","stackTrace":"at test:10","time":50}
+{"type":"testDone","testID":1,"result":"failure","time":100}
+{"type":"testStart","test":{"id":2,"name":"error test","suiteID":0},"time":100}
+{"type":"error","testID":2,"error":"Exception occurred","stackTrace":"at test:20","time":150}
+{"type":"testDone","testID":2,"result":"error","time":200}
+{"type":"done"}
+''';
+      await inputFile.writeAsString(inputJson);
+
+      final inputSource = FileInputSource(inputFile.path);
+      final inputResult = await inputSource.readJson();
+      expect(inputResult.isSuccess, isTrue);
+
+      const parser = DefaultDartTestParser();
+      final parseResult = parser.parse(inputResult.valueOrNull!);
+      expect(parseResult.isSuccess, isTrue);
+
+      const generator = DefaultJUnitXmlGenerator();
+      final xmlDoc = generator.convert(parseResult.valueOrNull!);
+
+      final outputFile = File('${tempDir.path}/output.xml');
+      final outputDest = FileOutputDestination(outputFile.path);
+      final outputResult = await outputDest.writeXml(xmlDoc);
+      expect(outputResult.isSuccess, isTrue);
+
+      final content = await outputFile.readAsString();
+      // Check failure element
+      expect(content, contains('<failure'));
+      expect(content, contains('type="AssertionError"'));
+      expect(content, contains('message="1 failure, see stacktrace for details"'));
+      expect(content, contains('Failure:'));
+      expect(content, contains('Assertion error'));
+      // Check error element
+      expect(content, contains('<error'));
+      expect(content, contains('message="1 error, see stacktrace for details"'));
+      expect(content, contains('Error:'));
+      expect(content, contains('Exception occurred'));
+      // Both should have AssertionError type
+      final assertionErrorCount = 'type="AssertionError"'.allMatches(content).length;
+      expect(assertionErrorCount, equals(2));
+    });
   });
 }
