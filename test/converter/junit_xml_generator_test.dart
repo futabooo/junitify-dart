@@ -1,5 +1,6 @@
 import 'package:junitify/junitify.dart';
 import 'package:test/test.dart';
+import 'package:xml/xml.dart';
 
 void main() {
   group('DefaultJUnitXmlGenerator', () {
@@ -1310,6 +1311,187 @@ void main() {
         expect(xmlString, contains('time="0.150"'));
         expect(xmlString, contains('classname="test.example_test"'));
       });
+    });
+
+    group('XML attribute order', () {
+      test('testsuite attributes are in standard order', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'example test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Parse XML to verify attribute order
+        final document = XmlDocument.parse(xmlString);
+        final testsuite = document.findAllElements('testsuite').first;
+
+        // Get attributes in order
+        final attributes = testsuite.attributes
+            .map((a) => a.name.local)
+            .toList();
+
+        // Expected order: name, tests, failures, errors, skipped, time
+        expect(attributes.length, greaterThanOrEqualTo(6));
+        expect(attributes[0], 'name');
+        expect(attributes[1], 'tests');
+        expect(attributes[2], 'failures');
+        expect(attributes[3], 'errors');
+        expect(attributes[4], 'skipped');
+        expect(attributes[5], 'time');
+      });
+
+      test('testcase attributes are in standard order', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'example test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                  file: 'test/example_test.dart',
+                  line: 10,
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Parse XML to verify attribute order
+        final document = XmlDocument.parse(xmlString);
+        final testcase = document.findAllElements('testcase').first;
+
+        // Get attributes in order
+        final attributes = testcase.attributes
+            .map((a) => a.name.local)
+            .toList();
+
+        // Expected order: name, classname, time, file, line
+        expect(attributes.length, greaterThanOrEqualTo(5));
+        expect(attributes[0], 'name');
+        expect(attributes[1], 'classname');
+        expect(attributes[2], 'time');
+        expect(attributes[3], 'file');
+        expect(attributes[4], 'line');
+      });
+
+      test(
+        'testcase attributes are in standard order without file and line',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'example test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          // Parse XML to verify attribute order
+          final document = XmlDocument.parse(xmlString);
+          final testcase = document.findAllElements('testcase').first;
+
+          // Get attributes in order
+          final attributes = testcase.attributes
+              .map((a) => a.name.local)
+              .toList();
+
+          // Expected order: name, classname, time
+          expect(attributes.length, greaterThanOrEqualTo(3));
+          expect(attributes[0], 'name');
+          expect(attributes[1], 'classname');
+          expect(attributes[2], 'time');
+        },
+      );
+
+      test(
+        'testcase attributes are in standard order with file but without line',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'example test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                    file: 'test/example_test.dart',
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          // Parse XML to verify attribute order
+          final document = XmlDocument.parse(xmlString);
+          final testcase = document.findAllElements('testcase').first;
+
+          // Get attributes in order
+          final attributes = testcase.attributes
+              .map((a) => a.name.local)
+              .toList();
+
+          // Expected order: name, classname, time, file
+          expect(attributes.length, greaterThanOrEqualTo(4));
+          expect(attributes[0], 'name');
+          expect(attributes[1], 'classname');
+          expect(attributes[2], 'time');
+          expect(attributes[3], 'file');
+        },
+      );
     });
   });
 }
