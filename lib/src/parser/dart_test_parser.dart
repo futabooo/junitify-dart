@@ -103,7 +103,7 @@ class DefaultDartTestParser implements DartTestParser {
             _processErrorEvent(event, testErrors);
             break;
           case 'print':
-            _processPrintEvent(event, printMessages);
+            _processPrintEvent(event, printMessages, tests, suites);
             break;
         }
       }
@@ -258,10 +258,10 @@ class DefaultDartTestParser implements DartTestParser {
   void _processPrintEvent(
     Map<String, dynamic> event,
     Map<int, StringBuffer> printMessages,
+    Map<int, _TestInfo> tests,
+    Map<String, _SuiteBuilder> suites,
   ) {
     final testID = event['testID'] as int?;
-    if (testID == null) return;
-
     final message = event['message'] as String?;
     final messageType = event['messageType'] as String?;
 
@@ -269,18 +269,75 @@ class DefaultDartTestParser implements DartTestParser {
     final isErrorOutput = messageType == 'stderr' || messageType == 'error';
     if (isErrorOutput) return;
 
-    // Get or create StringBuffer for this testID
-    final buffer = printMessages.putIfAbsent(testID, () => StringBuffer());
-
     // If message is null or empty, treat as newline
-    if (message == null || message.isEmpty) {
-      buffer.write('\n');
-    } else {
-      // Write message and ensure it ends with a newline
-      buffer.write(message);
-      // Add newline if message doesn't already end with one
-      if (!message.endsWith('\n')) {
+    final messageToAdd = message ?? '';
+
+    // Determine if this print event is associated with a test case
+    final testInfo = testID != null ? tests[testID] : null;
+    final isAssociatedWithTestCase = testInfo != null;
+
+    // Process for test case level (existing functionality)
+    // Only process if testID exists and test case is found
+    if (testID != null && isAssociatedWithTestCase) {
+      final buffer = printMessages.putIfAbsent(testID, () => StringBuffer());
+
+      if (messageToAdd.isEmpty) {
         buffer.write('\n');
+      } else {
+        // Write message and ensure it ends with a newline
+        buffer.write(messageToAdd);
+        // Add newline if message doesn't already end with one
+        if (!messageToAdd.endsWith('\n')) {
+          buffer.write('\n');
+        }
+      }
+    }
+
+    // Process for test suite level (new functionality)
+    // Only process if testID is missing or test case is not found
+    if (!isAssociatedWithTestCase) {
+      String? suiteName;
+
+      if (testInfo != null) {
+        // If testInfo exists, use its suiteName (this case shouldn't happen due to isAssociatedWithTestCase check)
+        suiteName = testInfo.suiteName;
+      } else if (testID != null) {
+        // If testID exists but testInfo not found, we can't determine the suite from testID
+        // Use the most recently created suite as a fallback (typically there's only one suite)
+        // This handles the case where print event comes before testStart or testID doesn't match
+        if (suites.length == 1) {
+          suiteName = suites.keys.first;
+        } else {
+          // Multiple suites exist - can't reliably determine which one
+          // Skip suite-level processing
+          return;
+        }
+      } else {
+        // If testID is missing, use the most recently created suite as a fallback
+        // Typically there's only one suite in the test run
+        if (suites.length == 1) {
+          suiteName = suites.keys.first;
+        } else {
+          // Multiple suites exist - can't reliably determine which one
+          // Skip suite-level processing
+          return;
+        }
+      }
+
+      final suite = suites[suiteName];
+      if (suite != null) {
+        // Get or create StringBuffer for this suite
+        suite.systemOut ??= StringBuffer();
+
+        // Add message to suite's systemOut
+        if (messageToAdd.isEmpty) {
+          suite.systemOut!.write('\n');
+        } else {
+          suite.systemOut!.write(messageToAdd);
+          if (!messageToAdd.endsWith('\n')) {
+            suite.systemOut!.write('\n');
+          }
+        }
       }
     }
   }
@@ -346,8 +403,15 @@ class DefaultDartTestParser implements DartTestParser {
           'Ignoring hidden test: ${testInfo.suiteName}::${testInfo.name}',
         );
       }
-      // Clean up print messages for hidden test
-      printMessages.remove(testID);
+      // For hidden tests, move print messages to suite level before removing
+      final printBuffer = printMessages.remove(testID);
+      if (printBuffer != null && printBuffer.isNotEmpty) {
+        final suite = suites[testInfo.suiteName];
+        if (suite != null) {
+          suite.systemOut ??= StringBuffer();
+          suite.systemOut!.write(printBuffer.toString());
+        }
+      }
       return;
     }
 
@@ -371,8 +435,12 @@ class DefaultDartTestParser implements DartTestParser {
     final duration = Duration(milliseconds: durationMs >= 0 ? durationMs : 0);
 
     // Get print messages for this test case
+    // Remove trailing newline to match tests_report_4.xml format
     final printBuffer = printMessages.remove(testID);
-    final systemOut = printBuffer?.toString();
+    final systemOutString = printBuffer?.toString();
+    final systemOut = systemOutString != null && systemOutString.endsWith('\n')
+        ? systemOutString.substring(0, systemOutString.length - 1)
+        : systemOutString;
 
     // Create test case
     final testCase = TestCase(
@@ -412,10 +480,19 @@ class DefaultDartTestParser implements DartTestParser {
         (sum, test) => sum + test.time,
       );
 
+      // Convert systemOut StringBuffer to String if not null
+      // Remove trailing newline to match tests_report_4.xml format
+      final systemOutString = builder.systemOut?.toString();
+      final systemOut =
+          systemOutString != null && systemOutString.endsWith('\n')
+          ? systemOutString.substring(0, systemOutString.length - 1)
+          : systemOutString;
+
       final testSuite = TestSuite(
         name: builder.name,
         testCases: builder.testCases,
         time: suiteTime,
+        systemOut: systemOut,
       );
 
       testSuites.add(testSuite);
@@ -511,6 +588,7 @@ class _SuiteBuilder {
   final String name;
   final int id;
   final List<TestCase> testCases = [];
+  StringBuffer? systemOut;
 }
 
 class _TestInfo {
