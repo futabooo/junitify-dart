@@ -49,13 +49,13 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
 
         // Test cases
         for (final testCase in suite.testCases) {
-          _buildTestCase(builder, testCase);
+          _buildTestCase(builder, testCase, suite);
         }
       },
     );
   }
 
-  void _buildTestCase(XmlBuilder builder, TestCase testCase) {
+  void _buildTestCase(XmlBuilder builder, TestCase testCase, TestSuite suite) {
     builder.element(
       'testcase',
       nest: () {
@@ -82,10 +82,10 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         // Status-specific elements
         switch (testCase.status) {
           case TestStatus.failed:
-            _buildFailureElement(builder, testCase);
+            _buildFailureElement(builder, testCase, suite);
             break;
           case TestStatus.error:
-            _buildErrorElement(builder, testCase);
+            _buildErrorElement(builder, testCase, suite);
             break;
           case TestStatus.skipped:
             _buildSkippedElement(builder);
@@ -98,35 +98,43 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     );
   }
 
-  void _buildFailureElement(XmlBuilder builder, TestCase testCase) {
+  void _buildFailureElement(XmlBuilder builder, TestCase testCase, TestSuite suite) {
     builder.element(
       'failure',
       nest: () {
+        // Set a short message in the message attribute with actual failure count
         if (testCase.errorMessage != null) {
-          builder.attribute('message', testCase.errorMessage!);
+          builder.attribute(
+            'message',
+            '${suite.totalFailures} failure${suite.totalFailures != 1 ? 's' : ''}, see stacktrace for details',
+          );
         }
-        builder.attribute('type', 'TestFailure');
+        builder.attribute('type', 'AssertionError');
 
-        // Stack trace as text content
-        if (testCase.stackTrace != null) {
-          builder.text(testCase.stackTrace!);
+        // Output error message as element content with "Failure:" prefix
+        if (testCase.errorMessage != null) {
+          builder.text('Failure:\n${testCase.errorMessage!}');
         }
       },
     );
   }
 
-  void _buildErrorElement(XmlBuilder builder, TestCase testCase) {
+  void _buildErrorElement(XmlBuilder builder, TestCase testCase, TestSuite suite) {
     builder.element(
       'error',
       nest: () {
+        // Set a short message in the message attribute with actual error count
         if (testCase.errorMessage != null) {
-          builder.attribute('message', testCase.errorMessage!);
+          builder.attribute(
+            'message',
+            '${suite.totalErrors} error${suite.totalErrors != 1 ? 's' : ''}, see stacktrace for details',
+          );
         }
-        builder.attribute('type', 'TestError');
+        builder.attribute('type', 'AssertionError');
 
-        // Stack trace as text content
-        if (testCase.stackTrace != null) {
-          builder.text(testCase.stackTrace!);
+        // Output error message as element content with "Error:" prefix
+        if (testCase.errorMessage != null) {
+          builder.text('Error:\n${testCase.errorMessage!}');
         }
       },
     );

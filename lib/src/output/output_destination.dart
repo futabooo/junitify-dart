@@ -36,7 +36,8 @@ class FileOutputDestination implements OutputDestination {
         pretty: true,
         indent: '  ',
         preserveWhitespace: (node) =>
-            node is XmlElement && node.name.local == 'system-out',
+            node is XmlElement && node.name.local == 'system-out' ||
+            node is XmlElement && node.name.local == 'failure',
       );
 
       // Write to file with UTF-8 encoding

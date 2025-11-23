@@ -69,9 +69,13 @@ void main() {
       final xmlString = xmlDoc.toXmlString();
 
       expect(xmlString, contains('<failure'));
-      expect(xmlString, contains('message="Expected: true, Actual: false"'));
-      expect(xmlString, contains('type="TestFailure"'));
-      expect(xmlString, contains('at test/example_test.dart:10'));
+      expect(
+        xmlString,
+        contains('message="1 failure, see stacktrace for details"'),
+      );
+      expect(xmlString, contains('type="AssertionError"'));
+      expect(xmlString, contains('Failure:'));
+      expect(xmlString, contains('Expected: true, Actual: false'));
       expect(xmlString, contains('classname="test.example_test"'));
     });
 
@@ -102,7 +106,13 @@ void main() {
       final xmlString = xmlDoc.toXmlString();
 
       expect(xmlString, contains('<error'));
-      expect(xmlString, contains('type="TestError"'));
+      expect(
+        xmlString,
+        contains('message="1 error, see stacktrace for details"'),
+      );
+      expect(xmlString, contains('type="AssertionError"'));
+      expect(xmlString, contains('Error:'));
+      expect(xmlString, contains('Exception: Something went wrong'));
       expect(xmlString, contains('classname="test.example_test"'));
     });
 
@@ -134,6 +144,469 @@ void main() {
       expect(xmlString, contains('<skipped'));
       expect(xmlString, contains('skipped="1"'));
       expect(xmlString, contains('classname="test.example_test"'));
+    });
+
+    group('failure XML output format', () {
+      test('failure element has AssertionError type', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Assertion error message',
+                  stackTrace: 'at test/example_test.dart:10',
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 1,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 100),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: true, indent: '  ');
+
+        expect(xmlString, contains('type="AssertionError"'));
+        expect(
+          xmlString,
+          contains('message="1 failure, see stacktrace for details"'),
+        );
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Assertion error message'));
+      });
+
+      test('failure element has formatted stack trace with blank lines', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Assertion error message',
+                  stackTrace:
+                      'package:matcher expect\ntest/example_test.dart 10:7  main.<fn>',
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 1,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 100),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        // Use pretty: false to preserve whitespace in text content
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that error message is present
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Assertion error message'));
+        // Stack trace is not included in the element content
+      });
+
+      test('failure element has error message when stack trace is null', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Assertion error message',
+                  stackTrace: null,
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 1,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 100),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that failure element contains error message
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Assertion error message'));
+      });
+
+      test('failure element has error message when stack trace is empty', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Assertion error message',
+                  stackTrace: '',
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 1,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 100),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that failure element contains error message
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Assertion error message'));
+      });
+
+      test('failure element shows correct count for multiple failures', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test 1',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Error 1',
+                ),
+                TestCase(
+                  name: 'failing test 2',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Error 2',
+                ),
+                TestCase(
+                  name: 'failing test 3',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Error 3',
+                ),
+              ],
+              time: const Duration(milliseconds: 300),
+            ),
+          ],
+          totalTests: 3,
+          totalFailures: 3,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 300),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: true, indent: '  ');
+
+        // Should show "3 failures" (plural)
+        expect(
+          xmlString,
+          contains('message="3 failures, see stacktrace for details"'),
+        );
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Error 1'));
+        expect(xmlString, contains('Error 2'));
+        expect(xmlString, contains('Error 3'));
+      });
+
+      test(
+        'failure element does not have message attribute when errorMessage is null',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'failing test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.failed,
+                    time: Duration(milliseconds: 100),
+                    errorMessage: null,
+                    stackTrace: 'at test/example_test.dart:10',
+                  ),
+                ],
+                time: const Duration(milliseconds: 100),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 1,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 100),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          expect(xmlString, contains('<failure'));
+          expect(xmlString, contains('type="AssertionError"'));
+          // Should not contain message attribute
+          expect(xmlString, isNot(contains('message=')));
+        },
+      );
+
+      test('failure element handles multiline error message', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'failing test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.failed,
+                  time: Duration(milliseconds: 100),
+                  errorMessage: 'Line 1\nLine 2\nLine 3',
+                  stackTrace: 'at test/example_test.dart:10',
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 1,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 100),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        expect(xmlString, contains('Failure:'));
+        expect(xmlString, contains('Line 1'));
+        expect(xmlString, contains('Line 2'));
+        expect(xmlString, contains('Line 3'));
+      });
+    });
+
+    group('error XML output format', () {
+      test('error element has AssertionError type', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 50),
+                  errorMessage: 'Exception: Something went wrong',
+                  stackTrace: 'at test/example_test.dart:10',
+                ),
+              ],
+              time: const Duration(milliseconds: 50),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 50),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: true, indent: '  ');
+
+        expect(xmlString, contains('type="AssertionError"'));
+        expect(
+          xmlString,
+          contains('message="1 error, see stacktrace for details"'),
+        );
+        expect(xmlString, contains('Error:'));
+        expect(xmlString, contains('Exception: Something went wrong'));
+      });
+
+      test('error element has formatted stack trace with blank lines', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 50),
+                  errorMessage: 'Exception: Something went wrong',
+                  stackTrace:
+                      'package:test expect\ntest/example_test.dart 10:7  main.<fn>',
+                ),
+              ],
+              time: const Duration(milliseconds: 50),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 50),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        // Use pretty: false to preserve whitespace in text content
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that error message is present
+        expect(xmlString, contains('Error:'));
+        expect(xmlString, contains('Exception: Something went wrong'));
+        // Stack trace is not included in the element content
+      });
+
+      test('error element has error message when stack trace is null', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 50),
+                  errorMessage: 'Exception: Something went wrong',
+                  stackTrace: null,
+                ),
+              ],
+              time: const Duration(milliseconds: 50),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 50),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that error element contains error message
+        expect(xmlString, contains('Error:'));
+        expect(xmlString, contains('Exception: Something went wrong'));
+      });
+
+      test('error element has error message when stack trace is empty', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 50),
+                  errorMessage: 'Exception: Something went wrong',
+                  stackTrace: '',
+                ),
+              ],
+              time: const Duration(milliseconds: 50),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 50),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString(pretty: false);
+
+        // Check that error element contains error message
+        expect(xmlString, contains('Error:'));
+        expect(xmlString, contains('Exception: Something went wrong'));
+      });
+
+      test(
+        'error element does not have message attribute when errorMessage is null',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'error test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.error,
+                    time: Duration(milliseconds: 50),
+                    errorMessage: null,
+                    stackTrace: 'at test/example_test.dart:10',
+                  ),
+                ],
+                time: const Duration(milliseconds: 50),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 50),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          expect(xmlString, contains('<error'));
+          expect(xmlString, contains('type="AssertionError"'));
+          // Should not contain message attribute
+          expect(xmlString, isNot(contains('message=')));
+        },
+      );
+
+      test('error element handles multiline error message', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'error test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.error,
+                  time: Duration(milliseconds: 50),
+                  errorMessage: 'Line 1\nLine 2\nLine 3',
+                  stackTrace: 'at test/example_test.dart:10',
+                ),
+              ],
+              time: const Duration(milliseconds: 50),
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 50),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        expect(xmlString, contains('Error:'));
+        expect(xmlString, contains('Line 1'));
+        expect(xmlString, contains('Line 2'));
+        expect(xmlString, contains('Line 3'));
+      });
     });
 
     test('handles multiple test suites', () {
