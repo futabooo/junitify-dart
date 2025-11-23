@@ -895,39 +895,46 @@ void main() {
         expect(systemOutCount, equals(2));
       });
 
-      test('does not generate system-out tag at testsuite level', () {
-        final testResult = DartTestResult(
-          suites: [
-            TestSuite(
-              name: 'test/example_test.dart',
-              testCases: const [
-                TestCase(
-                  name: 'test without output',
-                  className: 'test/example_test.dart',
-                  status: TestStatus.passed,
-                  time: Duration(milliseconds: 150),
-                ),
-              ],
-              time: const Duration(milliseconds: 150),
-              systemOut: 'Suite output that should be ignored',
-            ),
-          ],
-          totalTests: 1,
-          totalFailures: 0,
-          totalSkipped: 0,
-          totalTime: const Duration(milliseconds: 150),
-        );
+      test(
+        'generates system-out tag at testsuite level after testcase elements',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test without output',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+                systemOut: 'Suite output line 1\nSuite output line 2',
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
 
-        final xmlDoc = generator.convert(testResult);
-        final xmlString = xmlDoc.toXmlString();
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
 
-        // Should not contain system-out tag (testsuite level is ignored)
-        expect(xmlString, isNot(contains('<system-out>')));
-        expect(
-          xmlString,
-          isNot(contains('Suite output that should be ignored')),
-        );
-      });
+          // Should contain system-out tag at testsuite level
+          expect(xmlString, contains('<system-out>'));
+          expect(xmlString, contains('Suite output line 1'));
+          expect(xmlString, contains('Suite output line 2'));
+          // Should be after testcase elements (matching tests_report_4.xml format)
+          final systemOutIndex = xmlString.indexOf('<system-out>');
+          final testcaseIndex = xmlString.indexOf('<testcase');
+          final testcaseEndIndex = xmlString.indexOf('</testcase>');
+          expect(systemOutIndex, greaterThan(testcaseIndex));
+          expect(systemOutIndex, greaterThan(testcaseEndIndex));
+        },
+      );
     });
 
     group('system-err support', () {
@@ -1091,8 +1098,9 @@ void main() {
           // Should not contain system-err tag (testsuite level is ignored)
           expect(xmlString, isNot(contains('<system-err>')));
           expect(xmlString, isNot(contains('Suite error')));
-          // system-out at testsuite level should also be ignored
-          expect(xmlString, isNot(contains('Suite output')));
+          // system-out at testsuite level should be generated
+          expect(xmlString, contains('<system-out>'));
+          expect(xmlString, contains('Suite output'));
         },
       );
 
@@ -1128,8 +1136,9 @@ void main() {
           // Should not contain system-err tag (testsuite level is ignored)
           expect(xmlString, isNot(contains('<system-err>')));
           expect(xmlString, isNot(contains('Error line')));
-          // system-out at testsuite level should also be ignored
-          expect(xmlString, isNot(contains('Output line')));
+          // system-out at testsuite level should be generated
+          expect(xmlString, contains('<system-out>'));
+          expect(xmlString, contains('Output line'));
         },
       );
 

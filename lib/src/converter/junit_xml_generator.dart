@@ -51,6 +51,16 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         for (final testCase in suite.testCases) {
           _buildTestCase(builder, testCase, suite);
         }
+
+        // System-out element (after testcase elements, matching tests_report_4.xml format)
+        if (suite.systemOut != null && suite.systemOut!.isNotEmpty) {
+          builder.element(
+            'system-out',
+            nest: () {
+              builder.text(suite.systemOut!);
+            },
+          );
+        }
       },
     );
   }
@@ -74,9 +84,12 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
 
         // System-out element (before status-specific elements, per JUnit XML schema)
         if (testCase.systemOut != null && testCase.systemOut!.isNotEmpty) {
-          builder.element('system-out', nest: () {
-            builder.text(testCase.systemOut!);
-          });
+          builder.element(
+            'system-out',
+            nest: () {
+              builder.text(testCase.systemOut!);
+            },
+          );
         }
 
         // Status-specific elements
@@ -98,7 +111,11 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     );
   }
 
-  void _buildFailureElement(XmlBuilder builder, TestCase testCase, TestSuite suite) {
+  void _buildFailureElement(
+    XmlBuilder builder,
+    TestCase testCase,
+    TestSuite suite,
+  ) {
     builder.element(
       'failure',
       nest: () {
@@ -119,7 +136,11 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     );
   }
 
-  void _buildErrorElement(XmlBuilder builder, TestCase testCase, TestSuite suite) {
+  void _buildErrorElement(
+    XmlBuilder builder,
+    TestCase testCase,
+    TestSuite suite,
+  ) {
     builder.element(
       'error',
       nest: () {
@@ -186,10 +207,12 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
       // (contains only alphanumeric characters, typical for file extensions)
       final afterLastDot = normalized.substring(lastDotIndex + 1);
       if (afterLastDot.isNotEmpty &&
-          afterLastDot.codeUnits.every((code) =>
-              (code >= 48 && code <= 57) || // 0-9
-              (code >= 65 && code <= 90) || // A-Z
-              (code >= 97 && code <= 122))) {
+          afterLastDot.codeUnits.every(
+            (code) =>
+                (code >= 48 && code <= 57) || // 0-9
+                (code >= 65 && code <= 90) || // A-Z
+                (code >= 97 && code <= 122),
+          )) {
         // It's likely an extension, remove it
         normalized = normalized.substring(0, lastDotIndex);
       }
@@ -197,7 +220,8 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
 
     // Handle edge case: if result is only dots (e.g., `///` → `...` → ``)
     // or if result becomes empty after extension removal
-    if (normalized.isEmpty || normalized.codeUnits.every((code) => code == 46)) {
+    if (normalized.isEmpty ||
+        normalized.codeUnits.every((code) => code == 46)) {
       return '';
     }
 

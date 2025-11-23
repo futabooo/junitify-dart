@@ -144,12 +144,15 @@ void main() {
         final testResult = result.valueOrNull!;
         expect(testResult.totalTests, equals(1));
         expect(testResult.suites.first.testCases.length, equals(1));
-        expect(testResult.suites.first.testCases.first.name, equals('visible test'));
+        expect(
+          testResult.suites.first.testCases.first.name,
+          equals('visible test'),
+        );
       });
 
-    group('print event support', () {
-      test('collects print events and adds to test case systemOut', () {
-        const json = '''
+      group('print event support', () {
+        test('collects print events and adds to test case systemOut', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with output","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"First output line","messageType":"print","time":50}
@@ -157,22 +160,25 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        expect(testResult.suites.length, equals(1));
-        final suite = testResult.suites.first;
-        expect(suite.testCases.length, equals(1));
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, isNotNull);
-        expect(testCase.systemOut, equals('First output line\nSecond output line\n'));
-        // Suite level systemOut should be null
-        expect(suite.systemOut, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          expect(testResult.suites.length, equals(1));
+          final suite = testResult.suites.first;
+          expect(suite.testCases.length, equals(1));
+          final testCase = suite.testCases.first;
+          expect(testCase.systemOut, isNotNull);
+          expect(
+            testCase.systemOut,
+            equals('First output line\nSecond output line'),
+          );
+          // Suite level systemOut should be null (testcaseに紐付くprintイベントはtestsuiteレベルに含めない)
+          expect(suite.systemOut, isNull);
+        });
 
-      test('handles empty message in print event', () {
-        const json = '''
+        test('handles empty message in print event', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with empty output","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"","messageType":"print","time":50}
@@ -180,85 +186,95 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, equals('\nNon-empty line\n'));
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          final testCase = suite.testCases.first;
+          expect(testCase.systemOut, equals('\nNon-empty line'));
+        });
 
-      test('ignores print event when testID is missing', () {
-        const json = '''
+        test('processes print event at suite level when testID is missing', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","message":"Output without testID","messageType":"print","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          final testCase = suite.testCases.first;
+          expect(testCase.systemOut, isNull);
+          // Suite level systemOut should contain print event without testID (no trailing newline)
+          expect(suite.systemOut, isNotNull);
+          expect(suite.systemOut, equals('Output without testID'));
+        });
 
-      test('ignores print event when testID does not match any test', () {
-        const json = '''
+        test(
+          'processes print event at suite level when testID does not match any test',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":999,"message":"Output for non-existent test","messageType":"print","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+          expect(testCase.systemOut, isNull);
+          // Suite level systemOut should contain print event for non-existent testID (no trailing newline)
+          expect(suite.systemOut, isNotNull);
+          expect(suite.systemOut, equals('Output for non-existent test'));
+          },
+        );
 
-      test('handles missing message field in print event', () {
-        const json = '''
+        test('handles missing message field in print event', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":1,"messageType":"print","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        // Missing message field is treated as empty string, which becomes a newline
-        expect(testCase.systemOut, equals('\n'));
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          final testCase = suite.testCases.first;
+          // Missing message field is treated as empty string, which becomes a newline
+          // But trailing newline is removed to match tests_report_4.xml format
+          expect(testCase.systemOut, equals(''));
+        });
 
-      test('systemOut is null when no print events exist', () {
-        const json = '''
+        test('systemOut is null when no print events exist', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test without output","suiteID":0},"time":0}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          final testCase = suite.testCases.first;
+          expect(testCase.systemOut, isNull);
+        });
 
-      test('collects print events from multiple tests in same suite', () {
-        const json = '''
+        test('collects print events from multiple tests in same suite', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test 1","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"Output from test 1","messageType":"print","time":50}
@@ -268,22 +284,24 @@ void main() {
 {"type":"testDone","testID":2,"result":"success","time":200}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        expect(suite.testCases.length, equals(2));
-        expect(suite.testCases[0].systemOut, equals('Output from test 1\n'));
-        expect(suite.testCases[1].systemOut, equals('Output from test 2\n'));
-        // Suite level systemOut should be null
-        expect(suite.systemOut, isNull);
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          expect(suite.testCases.length, equals(2));
+          expect(suite.testCases[0].systemOut, equals('Output from test 1'));
+          expect(suite.testCases[1].systemOut, equals('Output from test 2'));
+          // Suite level systemOut should be null (testcaseに紐付くprintイベントのみが存在する場合)
+          expect(suite.systemOut, isNull);
+        });
       });
-    });
 
-    group('error output event support', () {
-      test('ignores error output events with messageType stderr (system-err not supported)', () {
-        const json = '''
+      group('error output event support', () {
+        test(
+          'ignores error output events with messageType stderr (system-err not supported)',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"Error line 1","messageType":"stderr","time":50}
@@ -291,39 +309,43 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        expect(testResult.suites.length, equals(1));
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        // system-err is not supported at testcase level, so it should be null
-        expect(testCase.systemOut, isNull);
-        expect(suite.systemErr, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            expect(testResult.suites.length, equals(1));
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+            // system-err is not supported at testcase level, so it should be null
+            expect(testCase.systemOut, isNull);
+            expect(suite.systemErr, isNull);
+          },
+        );
 
-      test('ignores error output events with messageType error (system-err not supported)', () {
-        const json = '''
+        test(
+          'ignores error output events with messageType error (system-err not supported)',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with error output","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"Error message","messageType":"error","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        // system-err is not supported at testcase level, so it should be null
-        expect(testCase.systemOut, isNull);
-        expect(suite.systemErr, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+            // system-err is not supported at testcase level, so it should be null
+            expect(testCase.systemOut, isNull);
+            expect(suite.systemErr, isNull);
+          },
+        );
 
-      test('ignores error output events (system-err not supported)', () {
-        const json = '''
+        test('ignores error output events (system-err not supported)', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test with empty error","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"","messageType":"stderr","time":50}
@@ -331,85 +353,93 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        // system-err is not supported at testcase level, so it should be null
-        expect(testCase.systemOut, isNull);
-        expect(suite.systemErr, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          final testCase = suite.testCases.first;
+          // system-err is not supported at testcase level, so it should be null
+          expect(testCase.systemOut, isNull);
+          expect(suite.systemErr, isNull);
+        });
 
-      test('ignores error output event when testID is missing', () {
-        const json = '''
+        test('ignores error output event when testID is missing', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","message":"Error without testID","messageType":"stderr","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        expect(suite.systemErr, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          expect(suite.systemErr, isNull);
+        });
 
-      test('ignores error output event when testID does not match any test', () {
-        const json = '''
+        test(
+          'ignores error output event when testID does not match any test',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":999,"message":"Error for non-existent test","messageType":"stderr","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        expect(suite.systemErr, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            expect(suite.systemErr, isNull);
+          },
+        );
 
-      test('ignores error output events with missing message (system-err not supported)', () {
-        const json = '''
+        test(
+          'ignores error output events with missing message (system-err not supported)',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":1,"messageType":"stderr","time":50}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        // system-err is not supported at testcase level, so it should be null
-        expect(testCase.systemOut, isNull);
-        expect(suite.systemErr, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+            // system-err is not supported at testcase level, so it should be null
+            expect(testCase.systemOut, isNull);
+            expect(suite.systemErr, isNull);
+          },
+        );
 
-      test('systemErr is null when no error output events exist', () {
-        const json = '''
+        test('systemErr is null when no error output events exist', () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test without error output","suiteID":0},"time":0}
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        expect(suite.systemErr, isNull);
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final suite = testResult.suites.first;
+          expect(suite.systemErr, isNull);
+        });
 
-      test('processes print events as systemOut when messageType is print or null', () {
-        const json = '''
+        test(
+          'processes print events as systemOut when messageType is print or null',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"Output line","messageType":"print","time":50}
@@ -417,21 +447,25 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, isNotNull);
-        expect(testCase.systemOut, contains('Output line'));
-        expect(testCase.systemOut, contains('Another output'));
-        expect(suite.systemOut, isNull);
-        expect(suite.systemErr, isNull);
-      });
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+            expect(testCase.systemOut, isNotNull);
+            expect(testCase.systemOut, contains('Output line'));
+            expect(testCase.systemOut, contains('Another output'));
+            // Suite level systemOut should be null (testcaseに紐付くprintイベントはtestsuiteレベルに含めない)
+            expect(suite.systemOut, isNull);
+            expect(suite.systemErr, isNull);
+          },
+        );
 
-      test('collects systemOut but ignores systemErr (system-err not supported)', () {
-        const json = '''
+        test(
+          'collects systemOut but ignores systemErr (system-err not supported)',
+          () {
+            const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"test","suiteID":0},"time":0}
 {"type":"print","testID":1,"message":"Output line","messageType":"print","time":50}
@@ -439,17 +473,18 @@ void main() {
 {"type":"testDone","testID":1,"result":"success","time":150}
 ''';
 
-        final result = parser.parse(json);
+            final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final suite = testResult.suites.first;
-        final testCase = suite.testCases.first;
-        expect(testCase.systemOut, equals('Output line\n'));
-        // system-err is not supported at testcase level
-        expect(suite.systemErr, isNull);
+            expect(result.isSuccess, isTrue);
+            final testResult = result.valueOrNull!;
+            final suite = testResult.suites.first;
+            final testCase = suite.testCases.first;
+            expect(testCase.systemOut, equals('Output line'));
+            // system-err is not supported at testcase level
+            expect(suite.systemErr, isNull);
+          },
+        );
       });
-    });
 
       test('processes test case normally when hidden is false', () {
         const json = '''
@@ -515,23 +550,26 @@ void main() {
         expect(testResult.suites.isEmpty, isTrue);
       });
 
-      test('outputs debug log when hidden test is detected and errorReporter is provided', () {
-        const json = '''
+      test(
+        'outputs debug log when hidden test is detected and errorReporter is provided',
+        () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"hidden test","suiteID":0},"time":0}
 {"type":"testDone","testID":1,"result":"success","hidden":true,"time":150}
 ''';
 
-        final errorReporter = _MockErrorReporter(debugMode: true);
-        final result = parser.parse(json, errorReporter: errorReporter);
+          final errorReporter = _MockErrorReporter(debugMode: true);
+          final result = parser.parse(json, errorReporter: errorReporter);
 
-        expect(result.isSuccess, isTrue);
-        expect(errorReporter.debugMessages.length, equals(1));
-        expect(
-          errorReporter.debugMessages.first,
-          equals('Ignoring hidden test: test/example_test.dart::hidden test'),
-        );
-      });
+          expect(result.isSuccess, isTrue);
+          expect(errorReporter.debugMessages.length, equals(1));
+          expect(
+            errorReporter.debugMessages.first,
+            equals('Ignoring hidden test: test/example_test.dart::hidden test'),
+          );
+        },
+      );
 
       test('does not output debug log when debugMode is false', () {
         const json = '''
@@ -694,8 +732,10 @@ void main() {
         expect(testCase.stackTrace, equals('at test:10'));
       });
 
-      test('overwrites error info when multiple error events occur for same testID', () {
-        const json = '''
+      test(
+        'overwrites error info when multiple error events occur for same testID',
+        () {
+          const json = '''
 {"type":"suite","suite":{"id":0,"platform":"vm","path":"test/example_test.dart"}}
 {"type":"testStart","test":{"id":1,"name":"failing test","suiteID":0},"time":0}
 {"type":"error","testID":1,"error":"First error","stackTrace":"at test:10","time":50}
@@ -703,15 +743,16 @@ void main() {
 {"type":"testDone","testID":1,"result":"failure","time":100}
 ''';
 
-        final result = parser.parse(json);
+          final result = parser.parse(json);
 
-        expect(result.isSuccess, isTrue);
-        final testResult = result.valueOrNull!;
-        final testCase = testResult.suites.first.testCases.first;
-        expect(testCase.status, equals(TestStatus.failed));
-        expect(testCase.errorMessage, equals('Second error'));
-        expect(testCase.stackTrace, equals('at test:20'));
-      });
+          expect(result.isSuccess, isTrue);
+          final testResult = result.valueOrNull!;
+          final testCase = testResult.suites.first.testCases.first;
+          expect(testCase.status, equals(TestStatus.failed));
+          expect(testCase.errorMessage, equals('Second error'));
+          expect(testCase.stackTrace, equals('at test:20'));
+        },
+      );
 
       test('testDone error field takes priority over error event', () {
         const json = '''
@@ -795,7 +836,10 @@ void main() {
         final testResult = result.valueOrNull!;
         final testCase = testResult.suites.first.testCases.first;
         expect(testCase.status, equals(TestStatus.error));
-        expect(testCase.errorMessage, equals('Exception: Something went wrong'));
+        expect(
+          testCase.errorMessage,
+          equals('Exception: Something went wrong'),
+        );
         expect(testCase.stackTrace, equals('at test:10'));
       });
 
@@ -957,8 +1001,14 @@ void main() {
         final testResult = result.valueOrNull!;
         expect(testResult.totalFailures, equals(2));
         expect(testResult.suites.first.testCases.length, equals(2));
-        expect(testResult.suites.first.testCases[0].errorMessage, equals('Error 1'));
-        expect(testResult.suites.first.testCases[1].errorMessage, equals('Error 2'));
+        expect(
+          testResult.suites.first.testCases[0].errorMessage,
+          equals('Error 1'),
+        );
+        expect(
+          testResult.suites.first.testCases[1].errorMessage,
+          equals('Error 2'),
+        );
       });
 
       test('cleans up error info after testDone processing', () {
