@@ -39,7 +39,9 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     builder.element(
       'testsuite',
       nest: () {
-        // Attributes
+        // Attributes in standard JUnit XML order:
+        // name, tests, failures, errors, skipped, time, timestamp (optional)
+        // Reference: https://github.com/testmoapp/junitxml
         builder.attribute('name', suite.name);
         builder.attribute('tests', suite.totalTests.toString());
         builder.attribute('failures', suite.totalFailures.toString());
@@ -69,7 +71,9 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     builder.element(
       'testcase',
       nest: () {
-        // Attributes
+        // Attributes in standard JUnit XML order:
+        // name, classname, time, file (optional), line (optional)
+        // Reference: https://github.com/testmoapp/junitxml
         builder.attribute('name', testCase.name);
         builder.attribute('classname', _normalizeClassName(testCase.className));
         builder.attribute('time', _formatDuration(testCase.time));
