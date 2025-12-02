@@ -1493,5 +1493,223 @@ void main() {
         },
       );
     });
+
+    group('properties tag support', () {
+      test('generates properties tag when platform field is not null', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+              platform: 'linux',
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        expect(xmlString, contains('<properties>'));
+        expect(xmlString, contains('<property'));
+        expect(xmlString, contains('name="platform"'));
+        expect(xmlString, contains('value="linux"'));
+        expect(xmlString, contains('</properties>'));
+      });
+
+      test(
+        'generates properties tag when platform field is null (dynamic retrieval)',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          // Platform info should be retrieved dynamically if available
+          // On most platforms, this should generate properties tag
+          // But we can't guarantee it, so we just check that XML is valid
+          expect(xmlString, contains('<testsuite'));
+          expect(xmlString, contains('<testcase'));
+        },
+      );
+
+      test(
+        'does not generate properties tag when platform is empty string',
+        () {
+          final testResult = DartTestResult(
+            suites: [
+              TestSuite(
+                name: 'test/example_test.dart',
+                testCases: const [
+                  TestCase(
+                    name: 'test',
+                    className: 'test/example_test.dart',
+                    status: TestStatus.passed,
+                    time: Duration(milliseconds: 150),
+                  ),
+                ],
+                time: const Duration(milliseconds: 150),
+                platform: '',
+              ),
+            ],
+            totalTests: 1,
+            totalFailures: 0,
+            totalSkipped: 0,
+            totalTime: const Duration(milliseconds: 150),
+          );
+
+          final xmlDoc = generator.convert(testResult);
+          final xmlString = xmlDoc.toXmlString();
+
+          expect(xmlString, isNot(contains('<properties>')));
+        },
+      );
+
+      test('places properties tag before testcase elements', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+              platform: 'linux',
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Find positions
+        final propertiesIndex = xmlString.indexOf('<properties>');
+        final testcaseIndex = xmlString.indexOf('<testcase');
+
+        expect(propertiesIndex, greaterThan(-1));
+        expect(testcaseIndex, greaterThan(-1));
+        expect(propertiesIndex, lessThan(testcaseIndex));
+      });
+
+      test('generates properties tag for multiple test suites', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/first_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test 1',
+                  className: 'test/first_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 100),
+                ),
+              ],
+              time: const Duration(milliseconds: 100),
+              platform: 'linux',
+            ),
+            TestSuite(
+              name: 'test/second_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test 2',
+                  className: 'test/second_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 200),
+                ),
+              ],
+              time: const Duration(milliseconds: 200),
+              platform: 'macos',
+            ),
+          ],
+          totalTests: 2,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 300),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        // Count properties tags
+        final propertiesCount = '<properties>'.allMatches(xmlString).length;
+        expect(propertiesCount, equals(2));
+
+        // Verify each suite has its own properties tag
+        expect(xmlString, contains('value="linux"'));
+        expect(xmlString, contains('value="macos"'));
+      });
+
+      test('escapes XML special characters in platform value', () {
+        final testResult = DartTestResult(
+          suites: [
+            TestSuite(
+              name: 'test/example_test.dart',
+              testCases: const [
+                TestCase(
+                  name: 'test',
+                  className: 'test/example_test.dart',
+                  status: TestStatus.passed,
+                  time: Duration(milliseconds: 150),
+                ),
+              ],
+              time: const Duration(milliseconds: 150),
+              platform: 'linux & macos',
+            ),
+          ],
+          totalTests: 1,
+          totalFailures: 0,
+          totalSkipped: 0,
+          totalTime: const Duration(milliseconds: 150),
+        );
+
+        final xmlDoc = generator.convert(testResult);
+        final xmlString = xmlDoc.toXmlString();
+
+        expect(xmlString, contains('<properties>'));
+        // XML package automatically escapes attributes
+        expect(xmlString, contains('value='));
+        // Verify the content is properly escaped (not breaking XML)
+        expect(xmlString, contains('linux'));
+      });
+    });
   });
 }

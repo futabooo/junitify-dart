@@ -137,13 +137,18 @@ class DefaultDartTestParser implements DartTestParser {
 
     final id = suite['id'] as int?;
     final path = suite['path'] as String?;
+    final platform = suite['platform'] as String?;
 
     if (id == null) {
       throw const MissingFieldError('suite.id');
     }
 
     final suiteName = path ?? 'test_suite_$id';
-    suites[suiteName] = _SuiteBuilder(name: suiteName, id: id);
+    suites[suiteName] = _SuiteBuilder(
+      name: suiteName,
+      id: id,
+      platform: platform,
+    );
   }
 
   void _processTestStartEvent(
@@ -513,6 +518,7 @@ class DefaultDartTestParser implements DartTestParser {
         testCases: builder.testCases,
         time: suiteTime,
         systemOut: systemOut,
+        platform: builder.platform,
       );
 
       testSuites.add(testSuite);
@@ -603,12 +609,13 @@ class DefaultDartTestParser implements DartTestParser {
 }
 
 class _SuiteBuilder {
-  _SuiteBuilder({required this.name, required this.id});
+  _SuiteBuilder({required this.name, required this.id, this.platform});
 
   final String name;
   final int id;
   final List<TestCase> testCases = [];
   StringBuffer? systemOut;
+  final String? platform;
 }
 
 class _TestInfo {
