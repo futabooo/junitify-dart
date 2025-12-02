@@ -6,6 +6,7 @@ class CliConfig {
     this.showHelp = false,
     this.showVersion = false,
     this.debugMode = false,
+    this.fileRelativeTo = '.',
   });
 
   /// Path to input JSON file (null means stdin).
@@ -23,11 +24,17 @@ class CliConfig {
   /// Whether to enable debug mode.
   final bool debugMode;
 
+  /// The relative path to calculate the path defined in the 'file' element in the test from.
+  /// Defaults to '.' (current working directory).
+  /// If null or empty, absolute paths are maintained.
+  final String? fileRelativeTo;
+
   @override
   String toString() =>
       'CliConfig('
       'input: ${inputPath ?? "stdin"}, '
       'output: ${outputPath ?? "stdout"}, '
-      'debug: $debugMode'
+      'debug: $debugMode, '
+      'fileRelativeTo: ${fileRelativeTo ?? "null"}'
       ')';
 }

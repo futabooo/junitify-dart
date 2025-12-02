@@ -89,6 +89,7 @@ class DefaultCliRunner implements CliRunner {
       final parseResult = parser.parse(
         jsonString,
         errorReporter: errorReporter,
+        fileRelativeTo: config.fileRelativeTo,
       );
 
       if (parseResult.isFailure) {
@@ -144,6 +145,12 @@ class DefaultCliRunner implements CliRunner {
         abbr: 'o',
         help: 'Output XML file path (default: stdout)',
       )
+      ..addOption(
+        'file-relative-to',
+        abbr: 'r',
+        help: "the relative path to calculate the path defined in the 'file' element in the test from",
+        defaultsTo: '.',
+      )
       ..addFlag(
         'help',
         abbr: 'h',
@@ -170,6 +177,7 @@ class DefaultCliRunner implements CliRunner {
       showHelp: results['help'] as bool,
       showVersion: results['version'] as bool,
       debugMode: results['debug'] as bool,
+      fileRelativeTo: results['file-relative-to'] as String?,
     );
   }
 
