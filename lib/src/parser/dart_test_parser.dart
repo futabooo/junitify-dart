@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../common/error.dart';
 import '../common/result.dart';
 import '../error/error_reporter.dart';
@@ -14,9 +16,13 @@ abstract class DartTestParser {
   /// Parses a JSON string into a DartTestResult.
   ///
   /// [errorReporter] is optional and used for debug logging when hidden tests are detected.
+  /// [fileRelativeTo] is optional and specifies the base directory for converting absolute paths
+  /// to relative paths in the file attribute. If null or empty, absolute paths are maintained.
+  /// Defaults to null for backward compatibility.
   Result<DartTestResult, ParseError> parse(
     String jsonString, {
     ErrorReporter? errorReporter,
+    String? fileRelativeTo,
   });
 }
 
@@ -28,6 +34,7 @@ class DefaultDartTestParser implements DartTestParser {
   Result<DartTestResult, ParseError> parse(
     String jsonString, {
     ErrorReporter? errorReporter,
+    String? fileRelativeTo,
   }) {
     try {
       // Parse JSON lines (Dart test outputs newline-delimited JSON)
@@ -54,7 +61,7 @@ class DefaultDartTestParser implements DartTestParser {
       }
 
       // Parse events into test results
-      return _parseEvents(events, errorReporter);
+      return _parseEvents(events, errorReporter, fileRelativeTo);
     } catch (e) {
       return Failure(JsonSyntaxError('Unexpected error: $e'));
     }
@@ -63,6 +70,7 @@ class DefaultDartTestParser implements DartTestParser {
   Result<DartTestResult, ParseError> _parseEvents(
     List<Map<String, dynamic>> events,
     ErrorReporter? errorReporter,
+    String? fileRelativeTo,
   ) {
     try {
       final suites = <String, _SuiteBuilder>{};
@@ -84,7 +92,7 @@ class DefaultDartTestParser implements DartTestParser {
             // Groups are optional, we handle them implicitly
             break;
           case 'testStart':
-            _processTestStartEvent(event, tests, suites);
+            _processTestStartEvent(event, tests, suites, fileRelativeTo);
             break;
           case 'testDone':
             _processTestDoneEvent(
@@ -142,6 +150,7 @@ class DefaultDartTestParser implements DartTestParser {
     Map<String, dynamic> event,
     Map<int, _TestInfo> tests,
     Map<String, _SuiteBuilder> suites,
+    String? fileRelativeTo,
   ) {
     final test = event['test'] as Map<String, dynamic>?;
     if (test == null) return;
@@ -166,7 +175,7 @@ class DefaultDartTestParser implements DartTestParser {
 
     // Extract file and line from testStart event
     final url = test['url'] as String?;
-    final file = _extractFilePathFromUrl(url);
+    final file = _extractFilePathFromUrl(url, fileRelativeTo);
     final line = _extractLineNumber(test['line']);
 
     tests[id] = _TestInfo(
@@ -182,15 +191,18 @@ class DefaultDartTestParser implements DartTestParser {
   /// Extracts a file path from a URL string.
   ///
   /// Converts `file://` URI format to a file path.
+  /// If [fileRelativeTo] is specified (not null and not empty), converts the absolute path
+  /// to a relative path using `path.relative`.
   /// Returns null if the URL is not a `file://` URI or is invalid.
   ///
   /// Examples:
-  ///   - `file:///home/user/project/test.dart` → `/home/user/project/test.dart`
-  ///   - `file:///C:/Users/project/test.dart` → `C:/Users/project/test.dart` (Windows)
+  ///   - `file:///home/user/project/test.dart` → `/home/user/project/test.dart` (if fileRelativeTo is null)
+  ///   - `file:///home/user/project/test.dart` → `test.dart` (if fileRelativeTo is `/home/user/project`)
+  ///   - `file:///C:/Users/project/test.dart` → `C:/Users/project/test.dart` (Windows, if fileRelativeTo is null)
   ///   - `http://example.com/test.dart` → null
   ///   - `null` → null
   ///   - `""` → null
-  String? _extractFilePathFromUrl(String? url) {
+  String? _extractFilePathFromUrl(String? url, String? fileRelativeTo) {
     if (url == null || url.isEmpty) {
       return null;
     }
@@ -207,12 +219,20 @@ class DefaultDartTestParser implements DartTestParser {
       }
 
       // Get the file path from URI
-      final path = uri.toFilePath(windows: Platform.isWindows);
+      final absolutePath = uri.toFilePath(windows: Platform.isWindows);
 
-      // Try to convert absolute path to relative path if possible
-      // For now, we'll return the absolute path as-is
-      // Future enhancement: convert to relative path based on current working directory
-      return path;
+      // Convert to relative path if fileRelativeTo is specified
+      if (fileRelativeTo != null && fileRelativeTo.isNotEmpty) {
+        try {
+          return p.relative(absolutePath, from: fileRelativeTo);
+        } catch (e) {
+          // If conversion fails (e.g., different drives on Windows), return absolute path as fallback
+          return absolutePath;
+        }
+      }
+
+      // Return absolute path if fileRelativeTo is not specified
+      return absolutePath;
     } catch (e) {
       // If URI parsing fails, return null
       return null;
