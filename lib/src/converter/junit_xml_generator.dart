@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:xml/xml.dart';
 
 import '../models/dart_test_result.dart';
@@ -48,6 +50,24 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('errors', suite.totalErrors.toString());
         builder.attribute('skipped', suite.totalSkipped.toString());
         builder.attribute('time', _formatDuration(suite.time));
+
+        // Properties element (before testcase elements, per JUnit XML schema)
+        // Reference: https://github.com/testmoapp/junitxml
+        final platformInfo = _getPlatformInfo(suite);
+        if (platformInfo != null && platformInfo.isNotEmpty) {
+          builder.element(
+            'properties',
+            nest: () {
+              builder.element(
+                'property',
+                attributes: {
+                  'name': 'platform',
+                  'value': platformInfo,
+                },
+              );
+            },
+          );
+        }
 
         // Test cases
         for (final testCase in suite.testCases) {
@@ -167,6 +187,39 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
 
   void _buildSkippedElement(XmlBuilder builder) {
     builder.element('skipped');
+  }
+
+  /// Gets platform information for a test suite.
+  ///
+  /// Returns the platform information from the TestSuite's platform field if available,
+  /// otherwise attempts to retrieve it dynamically from Platform.operatingSystem.
+  /// Returns null if platform information cannot be obtained (e.g., Web environment) or
+  /// if the platform field is an empty string.
+  ///
+  /// Parameters:
+  ///   [suite] - The TestSuite to get platform information for
+  ///
+  /// Returns:
+  ///   Platform information string (e.g., "linux", "macos", "windows") or null
+  String? _getPlatformInfo(TestSuite suite) {
+    // Use platform field if available and not empty
+    if (suite.platform != null && suite.platform!.isNotEmpty) {
+      return suite.platform;
+    }
+
+    // If platform field is empty string, return null (don't try dynamic retrieval)
+    if (suite.platform == '') {
+      return null;
+    }
+
+    // Try to get platform info dynamically
+    try {
+      final platform = Platform.operatingSystem;
+      return platform.isNotEmpty ? platform : null;
+    } catch (e) {
+      // Platform info not available (e.g., Web environment)
+      return null;
+    }
   }
 
   String _formatDuration(Duration duration) {

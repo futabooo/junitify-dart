@@ -9,6 +9,7 @@ class TestSuite {
     required this.time,
     this.systemOut,
     this.systemErr,
+    this.platform,
   });
 
   /// The name of the test suite (usually file path).
@@ -27,6 +28,11 @@ class TestSuite {
   /// Standard error output from all error output events in this test suite.
   /// Contains all error outputs joined by newlines in chronological order.
   final String? systemErr;
+
+  /// Platform information for this test suite (e.g., "linux", "macos", "windows").
+  /// This field is optional and can be set explicitly or retrieved dynamically
+  /// from Platform.operatingSystem during XML generation.
+  final String? platform;
 
   /// Returns the number of tests in this suite.
   int get totalTests => testCases.length;
@@ -51,11 +57,18 @@ class TestSuite {
           _listEquals(testCases, other.testCases) &&
           time == other.time &&
           systemOut == other.systemOut &&
-          systemErr == other.systemErr;
+          systemErr == other.systemErr &&
+          platform == other.platform;
 
   @override
-  int get hashCode =>
-      Object.hash(name, Object.hashAll(testCases), time, systemOut, systemErr);
+  int get hashCode => Object.hash(
+    name,
+    Object.hashAll(testCases),
+    time,
+    systemOut,
+    systemErr,
+    platform,
+  );
 
   @override
   String toString() =>

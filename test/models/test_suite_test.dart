@@ -387,5 +387,137 @@ void main() {
       expect(testSuite.systemOut, equals('Output line'));
       expect(testSuite.systemErr, equals('Error line'));
     });
+
+    test('platform field is optional and can be null', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      expect(testSuite.platform, isNull);
+    });
+
+    test('platform field can contain platform information', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'linux',
+      );
+
+      expect(testSuite.platform, equals('linux'));
+    });
+
+    test('platform field can be empty string', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: '',
+      );
+
+      expect(testSuite.platform, equals(''));
+    });
+
+    test('equals method includes platform field', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'linux',
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'linux',
+      );
+
+      final suite3 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'macos',
+      );
+
+      expect(suite1, equals(suite2));
+      expect(suite1, isNot(equals(suite3)));
+    });
+
+    test('hashCode includes platform field', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'linux',
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        platform: 'linux',
+      );
+
+      expect(suite1.hashCode, equals(suite2.hashCode));
+    });
   });
 }
