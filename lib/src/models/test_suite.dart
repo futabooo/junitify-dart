@@ -10,6 +10,7 @@ class TestSuite {
     this.systemOut,
     this.systemErr,
     this.platform,
+    this.timestamp,
   });
 
   /// The name of the test suite (usually file path).
@@ -33,6 +34,11 @@ class TestSuite {
   /// This field is optional and can be set explicitly or retrieved dynamically
   /// from Platform.operatingSystem during XML generation.
   final String? platform;
+
+  /// Timestamp when the test suite execution started.
+  /// This field is optional and can be set explicitly from JSON suite events
+  /// or retrieved dynamically using DateTime.now() during XML generation.
+  final DateTime? timestamp;
 
   /// Returns the number of tests in this suite.
   int get totalTests => testCases.length;
@@ -58,7 +64,8 @@ class TestSuite {
           time == other.time &&
           systemOut == other.systemOut &&
           systemErr == other.systemErr &&
-          platform == other.platform;
+          platform == other.platform &&
+          timestamp == other.timestamp;
 
   @override
   int get hashCode => Object.hash(
@@ -68,6 +75,7 @@ class TestSuite {
     systemOut,
     systemErr,
     platform,
+    timestamp,
   );
 
   @override

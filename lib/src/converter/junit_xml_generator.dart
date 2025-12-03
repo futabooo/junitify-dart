@@ -10,7 +10,14 @@ import '../models/test_suite.dart';
 /// Interface for generating JUnit XML from Dart test results.
 abstract class JUnitXmlGenerator {
   /// Converts a DartTestResult to a JUnit XML document.
-  XmlDocument convert(DartTestResult testResult);
+  ///
+  /// [inputPath] is the path to the input file if `--input` option was used.
+  /// [timestampOption] is the value of `--timestamp` option (`now`, `none`, or `yyyy-MM-ddTHH:mm:ss` format).
+  XmlDocument convert(
+    DartTestResult testResult, {
+    String? inputPath,
+    String? timestampOption,
+  });
 }
 
 /// Default implementation of JUnitXmlGenerator.
@@ -18,7 +25,11 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
   const DefaultJUnitXmlGenerator();
 
   @override
-  XmlDocument convert(DartTestResult testResult) {
+  XmlDocument convert(
+    DartTestResult testResult, {
+    String? inputPath,
+    String? timestampOption,
+  }) {
     final builder = XmlBuilder();
 
     // XML declaration is automatically added by XmlDocument
@@ -29,7 +40,12 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
       'testsuites',
       nest: () {
         for (final suite in testResult.suites) {
-          _buildTestSuite(builder, suite);
+          _buildTestSuite(
+            builder,
+            suite,
+            inputPath: inputPath,
+            timestampOption: timestampOption,
+          );
         }
       },
     );
@@ -37,7 +53,12 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
     return builder.buildDocument();
   }
 
-  void _buildTestSuite(XmlBuilder builder, TestSuite suite) {
+  void _buildTestSuite(
+    XmlBuilder builder,
+    TestSuite suite, {
+    String? inputPath,
+    String? timestampOption,
+  }) {
     builder.element(
       'testsuite',
       nest: () {
@@ -51,6 +72,16 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
         builder.attribute('skipped', suite.totalSkipped.toString());
         builder.attribute('time', _formatDuration(suite.time));
 
+        // Timestamp attribute (after time attribute, per JUnit XML schema)
+        final timestamp = _getTimestamp(
+          suite,
+          inputPath: inputPath,
+          timestampOption: timestampOption,
+        );
+        if (timestamp != null) {
+          builder.attribute('timestamp', _formatTimestamp(timestamp));
+        }
+
         // Properties element (before testcase elements, per JUnit XML schema)
         // Reference: https://github.com/testmoapp/junitxml
         final platformInfo = _getPlatformInfo(suite);
@@ -60,10 +91,7 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
             nest: () {
               builder.element(
                 'property',
-                attributes: {
-                  'name': 'platform',
-                  'value': platformInfo,
-                },
+                attributes: {'name': 'platform', 'value': platformInfo},
               );
             },
           );
@@ -225,6 +253,96 @@ class DefaultJUnitXmlGenerator implements JUnitXmlGenerator {
   String _formatDuration(Duration duration) {
     // Convert to seconds with millisecond precision
     return (duration.inMilliseconds / 1000.0).toStringAsFixed(3);
+  }
+
+  /// Formats a DateTime to ISO 8601 format without timezone (YYYY-MM-DDTHH:mm:ss).
+  ///
+  /// Converts a DateTime object to a string in the format `YYYY-MM-DDTHH:mm:ss`.
+  /// Timezone information is not included.
+  ///
+  /// Parameters:
+  ///   [dateTime] - The DateTime object to format
+  ///
+  /// Returns:
+  ///   Formatted timestamp string (e.g., "2025-12-02T14:25:31")
+  String _formatTimestamp(DateTime dateTime) {
+    final year = dateTime.year.toString().padLeft(4, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final second = dateTime.second.toString().padLeft(2, '0');
+    return '$year-$month-${day}T$hour:$minute:$second';
+  }
+
+  /// Gets timestamp for a test suite.
+  ///
+  /// Returns the timestamp from the TestSuite's timestamp field if available,
+  /// otherwise determines the timestamp based on the following priority:
+  /// 1. If [timestampOption] is specified:
+  ///    - `now`: Use current time (DateTime.now())
+  ///    - `none`: Return null (don't generate timestamp attribute)
+  ///    - `yyyy-MM-ddTHH:mm:ss` format: Parse and use the specified time
+  /// 2. If [timestampOption] is not specified:
+  ///    - If [inputPath] is specified: Use file modification time
+  ///    - Otherwise: Use current time (DateTime.now())
+  ///
+  /// Parameters:
+  ///   [suite] - The TestSuite to get timestamp for
+  ///   [inputPath] - Path to input file if `--input` option was used
+  ///   [timestampOption] - Value of `--timestamp` option (`now`, `none`, or `yyyy-MM-ddTHH:mm:ss` format)
+  ///
+  /// Returns:
+  ///   DateTime object representing the timestamp, or null if timestamp should not be generated
+  DateTime? _getTimestamp(
+    TestSuite suite, {
+    String? inputPath,
+    String? timestampOption,
+  }) {
+    // Use timestamp field if available
+    if (suite.timestamp != null) {
+      return suite.timestamp;
+    }
+
+    // Handle timestampOption if specified
+    if (timestampOption != null) {
+      if (timestampOption == 'now') {
+        try {
+          return DateTime.now();
+        } catch (e) {
+          return null;
+        }
+      } else if (timestampOption == 'none') {
+        return null;
+      } else {
+        // Try to parse as yyyy-MM-ddTHH:mm:ss format
+        try {
+          return DateTime.parse(timestampOption);
+        } catch (e) {
+          // Invalid format - will be handled by caller
+          rethrow;
+        }
+      }
+    }
+
+    // If timestampOption is not specified, use inputPath or current time
+    if (inputPath != null) {
+      try {
+        final file = File(inputPath);
+        if (file.existsSync()) {
+          return file.lastModifiedSync();
+        }
+      } catch (e) {
+        // File access failed, fallback to current time
+      }
+    }
+
+    // Fallback to current time
+    try {
+      return DateTime.now();
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Normalizes a classname string by converting slashes to dots and removing the extension.
