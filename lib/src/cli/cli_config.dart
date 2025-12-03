@@ -7,6 +7,7 @@ class CliConfig {
     this.showVersion = false,
     this.debugMode = false,
     this.fileRelativeTo = '.',
+    this.timestampOption,
   });
 
   /// Path to input JSON file (null means stdin).
@@ -28,6 +29,10 @@ class CliConfig {
   /// Defaults to '.' (current working directory).
   /// If null or empty, absolute paths are maintained.
   final String? fileRelativeTo;
+
+  /// Timestamp option value (`now`, `none`, or `yyyy-MM-ddTHH:mm:ss` format).
+  /// If null, timestamp is determined based on inputPath or current time.
+  final String? timestampOption;
 
   @override
   String toString() =>

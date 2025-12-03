@@ -519,5 +519,185 @@ void main() {
 
       expect(suite1.hashCode, equals(suite2.hashCode));
     });
+
+    test('timestamp field is optional and can be null', () {
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      expect(testSuite.timestamp, isNull);
+    });
+
+    test('timestamp field can contain DateTime value', () {
+      final timestamp = DateTime(2025, 12, 2, 14, 25, 31);
+      final testSuite = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp,
+      );
+
+      expect(testSuite.timestamp, equals(timestamp));
+    });
+
+    test('equals method includes timestamp field', () {
+      final timestamp1 = DateTime(2025, 12, 2, 14, 25, 31);
+      final timestamp2 = DateTime(2025, 12, 2, 14, 25, 31);
+      final timestamp3 = DateTime(2025, 12, 2, 14, 25, 32);
+
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp1,
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp2,
+      );
+
+      final suite3 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp3,
+      );
+
+      expect(suite1, equals(suite2));
+      expect(suite1, isNot(equals(suite3)));
+    });
+
+    test('equals method handles null timestamp correctly', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      expect(suite1, equals(suite2));
+    });
+
+    test('hashCode includes timestamp field', () {
+      final timestamp = DateTime(2025, 12, 2, 14, 25, 31);
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp,
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+        timestamp: timestamp,
+      );
+
+      expect(suite1.hashCode, equals(suite2.hashCode));
+    });
+
+    test('hashCode handles null timestamp correctly', () {
+      final suite1 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      final suite2 = TestSuite(
+        name: 'suite1',
+        testCases: const [
+          TestCase(
+            name: 'test1',
+            className: 'TestClass',
+            status: TestStatus.passed,
+            time: Duration(milliseconds: 100),
+          ),
+        ],
+        time: const Duration(milliseconds: 100),
+      );
+
+      expect(suite1.hashCode, equals(suite2.hashCode));
+    });
   });
 }

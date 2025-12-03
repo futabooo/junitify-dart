@@ -103,12 +103,30 @@ class DefaultCliRunner implements CliRunner {
         'Parsed ${testResult.totalTests} tests from ${testResult.suites.length} suites',
       );
 
-      // 3. Convert to XML
+      // 3. Validate timestamp option if specified
+      if (config.timestampOption != null) {
+        final timestampOption = config.timestampOption!;
+        if (timestampOption != 'now' &&
+            timestampOption != 'none' &&
+            !_isValidTimestampFormat(timestampOption)) {
+          _printError(
+            'Invalid timestamp option: "$timestampOption". '
+            'Expected "now", "none", or "yyyy-MM-ddTHH:mm:ss" format.',
+          );
+          return 1;
+        }
+      }
+
+      // 4. Convert to XML
       errorReporter.debug('Converting to JUnit XML');
-      final xmlDocument = generator.convert(testResult);
+      final xmlDocument = generator.convert(
+        testResult,
+        inputPath: config.inputPath,
+        timestampOption: config.timestampOption,
+      );
       errorReporter.debug('Conversion successful');
 
-      // 4. Write output
+      // 5. Write output
       final outputDest = config.outputPath != null
           ? FileOutputDestination(config.outputPath!)
           : const StdoutOutputDestination();
@@ -148,8 +166,15 @@ class DefaultCliRunner implements CliRunner {
       ..addOption(
         'file-relative-to',
         abbr: 'r',
-        help: "the relative path to calculate the path defined in the 'file' element in the test from",
+        help:
+            "the relative path to calculate the path defined in the 'file' element in the test from",
         defaultsTo: '.',
+      )
+      ..addOption(
+        'timestamp',
+        abbr: 't',
+        help:
+            'Timestamp option: "now" (current time), "none" (no timestamp), or "yyyy-MM-ddTHH:mm:ss" format',
       )
       ..addFlag(
         'help',
@@ -178,7 +203,25 @@ class DefaultCliRunner implements CliRunner {
       showVersion: results['version'] as bool,
       debugMode: results['debug'] as bool,
       fileRelativeTo: results['file-relative-to'] as String?,
+      timestampOption: results['timestamp'] as String?,
     );
+  }
+
+  /// Validates if a string matches the yyyy-MM-ddTHH:mm:ss format.
+  bool _isValidTimestampFormat(String value) {
+    // Basic format validation: yyyy-MM-ddTHH:mm:ss
+    final pattern = RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$');
+    if (!pattern.hasMatch(value)) {
+      return false;
+    }
+
+    // Try to parse to ensure it's a valid date/time
+    try {
+      DateTime.parse(value);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   void _printUsage(ArgParser parser) {
