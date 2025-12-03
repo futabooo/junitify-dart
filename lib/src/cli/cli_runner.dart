@@ -241,6 +241,14 @@ class DefaultCliRunner implements CliRunner {
     print('');
     print('  # Convert with debug output');
     print('  junitify -i test.json -o junit.xml --debug');
+    print('');
+    print('  # Convert with custom file relative path');
+    print('  junitify -i test.json -o junit.xml -r /path/to/project');
+    print('');
+    print('  # Convert with timestamp option');
+    print('  junitify -i test.json -o junit.xml -t now');
+    print('  junitify -i test.json -o junit.xml -t none');
+    print('  junitify -i test.json -o junit.xml -t 2024-01-01T12:00:00');
   }
 
   void _printError(String message) {

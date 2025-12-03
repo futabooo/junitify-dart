@@ -32,9 +32,11 @@ junitify --version
 
 - `-i, --input <path>` - Input JSON file path (default: stdin)
 - `-o, --output <path>` - Output XML file path (default: stdout)
+- `-r, --file-relative-to <path>` - The relative path to calculate the path defined in the 'file' element in the test from (default: '.')
+- `-t, --timestamp <value>` - Timestamp option: "now" (current time), "none" (no timestamp), or "yyyy-MM-ddTHH:mm:ss" format
 - `-h, --help` - Show usage information
 - `-v, --version` - Show version information
-- `--debug` - Enable debug mode with detailed error messages
+- `--debug` - Enable debug mode with detailed output
 
 ## Requirements
 
