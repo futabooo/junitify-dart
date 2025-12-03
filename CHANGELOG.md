@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2](https://github.com/futabooo/junitify-dart/compare/0.1.1...0.1.2) - 2025-12-03
+- feat: add file relative path option by @futabooo in https://github.com/futabooo/junitify-dart/pull/14
+- feat: add testsuite properties platform by @futabooo in https://github.com/futabooo/junitify-dart/pull/16
+- feat: add timestamp by @futabooo in https://github.com/futabooo/junitify-dart/pull/17
+- doc: update by @futabooo in https://github.com/futabooo/junitify-dart/pull/18
+
 ## [0.1.1](https://github.com/futabooo/junitify-dart/compare/0.1.0...0.1.1) - 2025-11-23
 - feat: support testcase system-out tag by @futabooo in https://github.com/futabooo/junitify-dart/pull/5
 - chore: sort spec foldor by @futabooo in https://github.com/futabooo/junitify-dart/pull/7
