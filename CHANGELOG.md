@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.3](https://github.com/futabooo/junitify-dart/compare/0.1.2...0.1.3) - 2026-11-16
+
+- chore(renovate): renovate.json を renovate-config の preset を extends する形に揃える by @futabooo in https://github.com/futabooo/junitify-dart/pull/21
+- chore(deps): update actions/checkout action to v5.1.0 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/24
+- chore(deps): update actions/create-github-app-token action to v2.2.2 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/25
+- chore(deps): update dart-lang/setup-dart action to v1.8.1 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/26
+- chore(deps): update softprops/action-gh-release action to v2.6.2 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/27
+- chore(deps): update songmu/tagpr action to v1.22.0 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/28
+- chore(deps): update actions/checkout action to v7 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/29
+- chore(deps): update actions/create-github-app-token action to v3 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/30
+- chore(deps): update softprops/action-gh-release action to v3 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/31
+- chore: bump Dart SDK to 3.14.0 by @futabooo in https://github.com/futabooo/junitify-dart/pull/32
+
 ## [0.1.2](https://github.com/futabooo/junitify-dart/compare/0.1.1...0.1.2) - 2025-12-03
 - feat: add file relative path option by @futabooo in https://github.com/futabooo/junitify-dart/pull/14
 - feat: add testsuite properties platform by @futabooo in https://github.com/futabooo/junitify-dart/pull/16
