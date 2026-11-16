@@ -1,6 +1,6 @@
 {
   "name": "junitify-dart",
-  "image": "dart:3.10.0",
+  "image": "dart:3.14.0",
 
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
