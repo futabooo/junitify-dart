@@ -10,13 +10,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.8: pubspec.yaml の SDK 下限（後方互換性の確認用）
+        # 3.14: 開発で使用している最新 stable
+        sdk: ['3.8', '3.14']
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
         with:
-          sdk: '3.10'
+          sdk: ${{ matrix.sdk }}
 
       - name: Install dependencies
         run: dart pub get
