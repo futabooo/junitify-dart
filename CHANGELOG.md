@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.4](https://github.com/futabooo/junitify-dart/compare/0.1.3...0.1.4) - 2026-11-27
+
+- chore(deps): update dart-lang/setup-dart action to v1.8.2 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/33
+- chore(deps): update actions/create-github-app-token action to v3.4.0 by @renovate[bot] in https://github.com/futabooo/junitify-dart/pull/34
+
 ## [0.1.3](https://github.com/futabooo/junitify-dart/compare/0.1.2...0.1.3) - 2026-11-16
 
 - chore(renovate): renovate.json を renovate-config の preset を extends する形に揃える by @futabooo in https://github.com/futabooo/junitify-dart/pull/21
